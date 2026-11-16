@@ -1,5 +1,7 @@
 # Match.Point – Co-Founder Speed-Dating Scheduler
 
+Live: https://vinipoo.github.io/Match.Point/
+
 React SPA (Vite) that runs fully in the browser. State auto-saves to localStorage, so a page refresh during the event loses nothing.
 
 ```bash
