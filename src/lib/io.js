@@ -303,7 +303,23 @@ export function exportMaster({ meetings, byId, settings, scores, explainFn, form
   XLSX.writeFile(wb, `matchpoint-master-matrix-${stamp()}.xlsx`);
 }
 
-export function whatsappText(p, meetings, byId, settings) {
+// Pre-event message with the participant's personal link
+export function inviteText(p, link) {
+  const first = String(p.name || '').split(' ')[0];
+  return [
+    `היי ${first}! 👋`,
+    `מחכים לך ב-${EVENT.brand} – ${EVENT.titleHe} ${EVENT.titleEn}`,
+    `📍 ${EVENT.venueHe} / ${EVENT.venueEn}, ${EVENT.address} · 🗓️ ${EVENT.date} · ${EVENT.doors}`,
+    '',
+    'זה הקישור האישי שלך לערב (לא להעביר הלאה 🙏):',
+    link,
+    '',
+    'בהפסקה שאחרי הפיצ׳ים תבחר/י בו את מי תרצה/י לפגוש, ובסוף יופיע בו הלו״ז האישי שלך – שולחנות, שעות ושותפים.',
+    'נתראה! צוות הרציף',
+  ].join('\n');
+}
+
+export function whatsappText(p, meetings, byId, settings, link = '') {
   const first = p.name.split(' ')[0];
   const slots = personalSchedule(p, meetings, byId, settings);
   const lines = slots.map((s) =>
@@ -319,8 +335,9 @@ export function whatsappText(p, meetings, byId, settings) {
     '',
     ...lines,
     '',
-    `כל סבב ${settings.roundMin} דקות + ${settings.transitionMin} דקות מעבר. מומלץ להגיע עם Pitch של דקה 🎯`,
-    'נתראה! צוות הרציף',
+    `כל סבב ${settings.roundMin} דקות + ${settings.transitionMin} דקות מעבר.`,
+    ...(link ? [`📲 הלו״ז מתעדכן בזמן אמת כאן: ${link}`] : []),
+    'בהצלחה! צוות הרציף',
   ].join('\n');
 }
 

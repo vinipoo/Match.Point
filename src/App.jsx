@@ -8,6 +8,7 @@ import ParticipantsTab from './tabs/ParticipantsTab';
 import EngineTab from './tabs/EngineTab';
 import BoardTab from './tabs/BoardTab';
 import ExportTab from './tabs/ExportTab';
+import LiveTab from './tabs/LiveTab';
 
 const STORE = 'matchpoint-state-v1';
 const loadState = () => {
@@ -16,10 +17,11 @@ const loadState = () => {
 
 const TABS = [
   { id: 'setup', num: '01', label: 'הגדרות וטעינת נתונים' },
-  { id: 'people', num: '02', label: "משתתפים וצ'ק-אין", live: true },
-  { id: 'engine', num: '03', label: 'מנוע שיבוץ ומשקלים' },
-  { id: 'board', num: '04', label: 'לוח סבבים ושולחנות' },
-  { id: 'export', num: '05', label: 'ייצוא והפצה' },
+  { id: 'people', num: '02', label: "משתתפים וצ'ק-אין" },
+  { id: 'live', num: '03', label: 'ערב האירוע: העדפות ופרסום', live: true },
+  { id: 'engine', num: '04', label: 'מנוע שיבוץ ומשקלים' },
+  { id: 'board', num: '05', label: 'לוח סבבים ושולחנות' },
+  { id: 'export', num: '06', label: 'ייצוא והפצה' },
 ];
 
 export default function App() {
@@ -32,15 +34,31 @@ export default function App() {
   const [meetings, setMeetings] = useState(saved?.meetings || []);
   const [lastRun, setLastRun] = useState(saved?.lastRun || null);
   const [theme, setTheme] = useState(saved?.theme || 'light');
+  const [cloud, setCloud] = useState({ key: '', tokens: {}, ...(saved?.cloud || {}) });
   const [toast, setToast] = useState(null);
 
   const setSettings = useCallback((patch) => setSettingsRaw((s) => ({ ...s, ...(typeof patch === 'function' ? patch(s) : patch) })), []);
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORE, JSON.stringify({ tab, participants, settings, weights, constraints, meetings, lastRun, theme }));
+      localStorage.setItem(STORE, JSON.stringify({ tab, participants, settings, weights, constraints, meetings, lastRun, theme, cloud }));
     } catch { /* storage unavailable – app still works in-memory */ }
-  }, [tab, participants, settings, weights, constraints, meetings, lastRun, theme]);
+  }, [tab, participants, settings, weights, constraints, meetings, lastRun, theme, cloud]);
+
+  // full staff-state snapshot for the cloud backup
+  const snapshot = useCallback(
+    () => ({ participants, settings, weights, constraints, meetings, lastRun }),
+    [participants, settings, weights, constraints, meetings, lastRun],
+  );
+  const restore = useCallback((s) => {
+    if (!s) return;
+    setParticipants(s.participants || []);
+    setSettingsRaw({ ...DEFAULT_SETTINGS, ...(s.settings || {}) });
+    setWeights({ ...DEFAULT_WEIGHTS, ...(s.weights || {}) });
+    setConstraints(s.constraints || { must: [], exclude: [] });
+    setMeetings(s.meetings || []);
+    setLastRun(s.lastRun || null);
+  }, []);
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
 
@@ -99,6 +117,7 @@ export default function App() {
     participants, setParticipants, byId, settings, setSettings, weights, setWeights,
     constraints, setConstraints, addConstraint, removeConstraint,
     meetings: visibleMeetings, setMeetings, scores, active, gaps, stats, broken, lastRun, run, notify, setTab,
+    cloud, setCloud, snapshot, restore,
   };
 
   const checkedIn = participants.filter((p) => p.status === 'checked_in').length;
@@ -149,6 +168,7 @@ export default function App() {
       <main>
         {tab === 'setup' && <SetupTab {...ctx} setWeights={setWeights} setLastRun={setLastRun} />}
         {tab === 'people' && <ParticipantsTab {...ctx} />}
+        {tab === 'live' && <LiveTab {...ctx} />}
         {tab === 'engine' && <EngineTab {...ctx} />}
         {tab === 'board' && <BoardTab {...ctx} />}
         {tab === 'export' && <ExportTab {...ctx} />}

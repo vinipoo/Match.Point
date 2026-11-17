@@ -3,12 +3,14 @@ import { Card, M, SideTag, Reason, Modal, Empty } from '../components/ui';
 import { explain } from '../engine/scoring';
 import { roundTime, roundEnd } from '../engine/scheduler';
 import { EVENT } from '../lib/constants';
+import { participantLink } from '../lib/cloud';
 import { exportSchedules, exportMaster, whatsappText, waLink, copyText, personalSchedule } from '../lib/io';
 
 const pad = (n) => String(n).padStart(2, '0');
 
 export default function ExportTab(props) {
-  const { participants, byId, settings, meetings, scores, active, notify, setTab, stats } = props;
+  const { participants, byId, settings, meetings, scores, active, notify, setTab, stats, cloud } = props;
+  const linkOf = (id) => participantLink(cloud?.tokens?.[id]);
   const [wa, setWa] = useState(null);
   const [q, setQ] = useState('');
   const activeSet = useMemo(() => new Set(active), [active]);
@@ -16,7 +18,7 @@ export default function ExportTab(props) {
   const args = { participants, meetings, byId, settings, active, scores, explainFn: explain };
 
   if (!meetings.length) {
-    return <Empty title="אין שיבוץ לייצוא">הריצו שיבוץ בלשונית <M>03</M> או <M>04</M>.<br /><button className="btn btn-lime" style={{ marginTop: 12 }} onClick={() => setTab('engine')}>למנוע השיבוץ</button></Empty>;
+    return <Empty title="אין שיבוץ לייצוא">הריצו שיבוץ בלשונית <M>04</M> או <M>05</M>.<br /><button className="btn btn-lime" style={{ marginTop: 12 }} onClick={() => setTab('engine')}>למנוע השיבוץ</button></Empty>;
   }
 
   const copy = async (text) => notify((await copyText(text)) ? 'ההודעה הועתקה ✓' : 'ההעתקה נכשלה – סמנו והעתיקו ידנית', 'ok');
@@ -61,7 +63,7 @@ export default function ExportTab(props) {
                       ))}
                       <td className="nowrap">
                         <button className="btn btn-xs btn-lime" onClick={() => setWa(p)}>הודעה <M>WA</M></button>{' '}
-                        <button className="btn btn-xs" onClick={() => copy(whatsappText(p, meetings, byId, settings))}>העתק</button>
+                        <button className="btn btn-xs" onClick={() => copy(whatsappText(p, meetings, byId, settings, linkOf(p.id)))}>העתק</button>
                       </td>
                     </tr>
                   );
@@ -123,7 +125,7 @@ export default function ExportTab(props) {
       </Card>
 
       {wa && (() => {
-        const text = whatsappText(wa, meetings, byId, settings);
+        const text = whatsappText(wa, meetings, byId, settings, linkOf(wa.id));
         return (
           <Modal title={`הודעת WhatsApp · ${wa.name}`} onClose={() => setWa(null)}
             footer={
