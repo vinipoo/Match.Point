@@ -7,6 +7,7 @@ const toList = (s) => s.split(/[;,]/).map((x) => x.trim()).filter(Boolean);
 export default function ParticipantForm({ initial, participants, onSave, onClose }) {
   const [p, setP] = useState(() => ({
     ...initial,
+    idea: initial.idea || '',
     skillsTxt: (initial.skills || []).join('; '),
     seekTxt: (initial.seekSkills || []).join('; '),
     indTxt: (initial.industry || []).join('; '),
@@ -64,6 +65,7 @@ export default function ParticipantForm({ initial, participants, onSave, onClose
           <div className="field" style={{ justifyContent: 'flex-end' }}>
             <Toggle checked={p.openToJoin} onChange={(v) => set({ openToJoin: v })} label="פתוח/ה להצטרף למיזם של אחר/ת" />
           </div>
+          {Txt({ label: 'מיזם / רעיון קיים', k: 'idea', area: true })}
           {Txt({ label: 'מה מביא/ה לשולחן', k: 'brings', area: true })}
           {Txt({ label: 'איזה שותף/ה מחפש/ת', k: 'seeking', area: true })}
           {Txt({ label: 'כישורים (מופרדים ב-;)', k: 'skillsTxt' })}

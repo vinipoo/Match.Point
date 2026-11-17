@@ -35,7 +35,7 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
                 {p?.name || '—'} {p && <SideTag side={p.side} />}
                 {p && !activeSet.has(p.id) && <span className="tag tag-mag">לא פעיל</span>}
               </div>
-              <div className="pr trunc">{p?.brings}</div>
+              <div className="pr trunc" title={p?.idea || p?.brings}>{p?.idea || p?.brings}</div>
             </div>
           </div>
         ))}

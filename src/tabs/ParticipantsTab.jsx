@@ -4,7 +4,7 @@ import ParticipantForm from '../components/ParticipantForm';
 import { SIDES, STATUSES, VENTURE, AVAIL, STAGES } from '../lib/constants';
 
 const blank = (id) => ({
-  _new: true, id, name: '', email: '', phone: '', side: 'tech', status: 'checked_in', brings: '', seeking: '',
+  _new: true, id, name: '', email: '', phone: '', side: 'tech', status: 'checked_in', brings: '', seeking: '', idea: '',
   skills: [], seekSkills: [], industry: [], stage: 'none', ventureMode: 'flex', openToJoin: true, availability: 'part', prefs: [],
 });
 
@@ -26,7 +26,7 @@ export default function ParticipantsTab(props) {
     return participants.filter((p) =>
       (side === 'all' || p.side === side) &&
       (status === 'all' || p.status === status) &&
-      (!t || [p.name, p.id, p.brings, p.phone, ...(p.skills || [])].join(' ').toLowerCase().includes(t)));
+      (!t || [p.name, p.id, p.brings, p.idea, p.email, p.phone, ...(p.skills || [])].join(' ').toLowerCase().includes(t)));
   }, [participants, q, side, status]);
 
   const nameOf = (id) => participants.find((p) => p.id === id)?.name || id;
@@ -137,7 +137,8 @@ export default function ParticipantsTab(props) {
                       </div>
                     </td>
                     <td>
-                      <div className="trunc small">{p.brings}</div>
+                      {p.idea && <div className="trunc small" style={{ fontWeight: 600 }} title={p.idea}>{p.idea}</div>}
+                      <div className="trunc small muted" title={p.brings}>{p.brings}</div>
                       <div className="chips" style={{ marginTop: 3 }}>{(p.skills || []).slice(0, 3).map((s) => <span key={s} className="tag">{s}</span>)}</div>
                     </td>
                     <td className="small">

@@ -96,7 +96,7 @@ export default function SetupTab(props) {
             <details className="small">
               <summary style={{ cursor: 'pointer', fontWeight: 600 }}>מבנה עמודות נתמך</summary>
               <p className="muted" style={{ margin: '6px 0 0' }}>
-                <M>id, name, email, phone, side (tech/business/both), status (confirmed/checked-in/no-show/pending), brings, seeking,
+                <M>id, name, email, phone, side (tech/business/both), status (confirmed/checked-in/no-show/pending), brings, seeking, idea,
                 skills, seek_skills, industry, stage (idea/mvp/growth/none), venture_mode (own/join/new/flex), open_to_join (yes/no),
                 availability (full/part/evenings), preferences (P03:1; P07:2), must_match, exclude</M>
                 <br />רשימות מופרדות ב-<M>;</M> · העדפות לפי מזהה או שם מלא, עם דירוג אופציונלי <M>1-5</M>.

@@ -11,9 +11,12 @@ const joinList = (a) => (a || []).join('; ');
 const ALIASES = {
   id: ['id', 'מזהה', 'מס׳', 'מספר'],
   name: ['name', 'full name', 'שם', 'שם מלא'],
-  email: ['email', 'e-mail', 'mail', 'אימייל', 'מייל', 'דוא"ל'],
-  phone: ['phone', 'mobile', 'טלפון', 'נייד'],
+  firstName: ['first name', 'first_name', 'שם פרטי'],
+  lastName: ['last name', 'last_name', 'שם משפחה'],
+  email: ['email', 'e-mail', 'mail', 'אימייל', 'מייל', 'דוא"ל', 'כתובת מייל', 'כתובת אימייל'],
+  phone: ['phone', 'mobile', 'טלפון', 'נייד', 'מספר טלפון'],
   side: ['side', 'צד', 'צד באירוע', 'תפקיד'],
+  idea: ['idea', 'רעיון', 'מיזם'],
   status: ['status', 'rsvp', 'סטטוס', 'סטטוס הגעה'],
   brings: ['brings', 'what i bring', 'מה מביא', 'מה מביא/ה לשולחן', 'מה הוא מביא לשולחן'],
   seeking: ['seeking', 'looking for', 'מחפש', 'מחפש/ת', 'איזה שותף מחפש'],
@@ -29,6 +32,39 @@ const ALIASES = {
   exclude: ['exclude', 'החרגה', 'לא לשבץ עם'],
 };
 
+// Long Google-Form questions, matched by prefix (duplicate headers arrive as "…_1")
+const PREFIX_ALIASES = [
+  ['side', 'מה מתאר את הצד שלך'],
+  ['idea', 'אם יש לך מיזם או רעיון'],
+  ['experience', 'מה כבר עשית בפועל'],
+  ['industry', 'מה הדומיין'],
+  ['industryNote', 'פרט/י'],
+];
+
+// Experience answers from the registration form -> skill tag + venture stage
+const EXPERIENCE = [
+  ['יש לי רעיון', 'רעיון בשלב מוקדם', 'idea'],
+  ['דיברתי עם לקוחות', 'ולידציה מול לקוחות', 'idea'],
+  ['נכונות לשלם', 'לקוחות משלמים', 'mvp'],
+  ['בניתי והובלתי פעילות עסקית', 'הובלה עסקית', 'mvp'],
+  ['הובלתי פיתוח', 'הובלת צוות פיתוח', 'none'],
+  ['בניתי מוצר או mvp', 'בניית MVP', 'mvp'],
+  ['בניתי פרויקטים עצמאיים', 'פרויקטים עצמאיים', 'none'],
+  ['לומד/ת פיתוח', 'בלימודי פיתוח', 'none'],
+];
+const SIDE_SKILL = { tech: 'פיתוח', business: 'עסקי' };
+
+// "טופס 1: …\n\nטופס 2: …" (someone submitted the form more than once)
+const formParts = (v) => String(v ?? '').split(/טופס\s*\d+\s*:/).map((s) => s.trim()).filter(Boolean);
+const lastFormAnswer = (v) => { const p = formParts(v); return p.length ? p[p.length - 1] : ''; };
+const uniq = (a) => [...new Set(a)];
+
+const normPhone = (v) => {
+  const d = String(v ?? '').replace(/\D/g, '');
+  if (/^972\d{8,9}$/.test(d)) return `0${d.slice(3, 5)}-${d.slice(5)}`;
+  return String(v ?? '').trim();
+};
+
 const VALUES = {
   side: { tech: 'tech', technical: 'tech', 'טכנולוגי': 'tech', 'טכני': 'tech', business: 'business', biz: 'business', 'עסקי': 'business', both: 'both', hybrid: 'both', 'היברידי': 'both' },
   status: { confirmed: 'confirmed', 'מאושר': 'confirmed', 'checked-in': 'checked_in', checked_in: 'checked_in', checkedin: 'checked_in', 'הגיע': 'checked_in', 'הגיע בפועל': 'checked_in', 'no-show': 'no_show', no_show: 'no_show', noshow: 'no_show', 'לא הגיע': 'no_show', pending: 'pending', 'בהמתנה': 'pending', waitlist: 'pending' },
@@ -36,7 +72,16 @@ const VALUES = {
   ventureMode: { own: 'own', 'יש מיזם': 'own', join: 'join', 'הצטרפות': 'join', 'הצטרפות למיזם קיים': 'join', new: 'new', 'חדש': 'new', 'הקמה מאפס': 'new', flex: 'flex', 'גמיש': 'flex' },
   availability: { full: 'full', 'מלאה': 'full', 'משרה מלאה': 'full', part: 'part', 'חלקית': 'part', 'משרה חלקית': 'part', evenings: 'evenings', 'ערבים': 'evenings', side: 'evenings' },
 };
-const mapVal = (field, v, def) => VALUES[field][norm(v)] || def;
+const mapVal = (field, v, def) => {
+  const n = norm(v);
+  if (VALUES[field][n]) return VALUES[field][n];
+  if (field === 'side' && n) {
+    if (n.includes('היבריד') || n.includes('both') || (n.includes('טכנו') && n.includes('עסקי'))) return 'both';
+    if (n.includes('טכנו') || n.includes('tech') || n.includes('פיתוח')) return 'tech';
+    if (n.includes('עסקי') || n.includes('business') || n.includes('שיווק') || n.includes('מכירות') || n.includes('מנכ')) return 'business';
+  }
+  return def;
+};
 const truthy = (v) => ['1', 'true', 'yes', 'y', 'כן', 'v', '✓'].includes(norm(v));
 
 export async function readFile(file) {
@@ -49,8 +94,9 @@ export async function readFile(file) {
 export function mapRows(rows) {
   const warnings = [];
   const fieldOf = (h) => {
-    const n = norm(h);
+    const n = norm(h).replace(/_\d+$/, '');
     for (const [f, al] of Object.entries(ALIASES)) if (al.some((a) => norm(a) === n)) return f;
+    for (const [f, prefix] of PREFIX_ALIASES) if (n.startsWith(norm(prefix))) return f;
     return null;
   };
   const recs = [];
@@ -59,9 +105,16 @@ export function mapRows(rows) {
     const r = {};
     for (const [h, v] of Object.entries(row)) {
       const f = fieldOf(h);
-      if (f) r[f] = v;
+      // duplicate columns (e.g. the same question for Tech and for Business): keep the filled one
+      if (f && (String(v ?? '').trim() || r[f] == null)) r[f] = v;
     }
-    if (!String(r.name ?? '').trim()) { warnings.push(`שורה ${i + 2}: חסר שם – השורה דולגה`); return; }
+    if (!String(r.name ?? '').trim()) {
+      r.name = [r.firstName, r.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ');
+    }
+    if (!String(r.name ?? '').trim()) {
+      if (Object.values(row).some((v) => String(v ?? '').trim())) warnings.push(`שורה ${i + 2}: חסר שם – השורה דולגה`);
+      return;
+    }
     let id = String(r.id ?? '').trim() || `P${String(i + 1).padStart(2, '0')}`;
     if (seen.has(id)) { warnings.push(`שורה ${i + 2}: מזהה כפול ${id} – הוקצה מזהה חדש`); id = `${id}-${i + 2}`; }
     seen.add(id);
@@ -93,19 +146,36 @@ export function mapRows(rows) {
         else warnings.push(`${r.name}: לא נמצא משתתף "${tok}" ב-${field}`);
       }
     }
+    const side = mapVal('side', lastFormAnswer(r.side), 'both');
+    // registration-form answers -> profile fields (only fill what the file did not state explicitly)
+    const experience = lastFormAnswer(r.experience);
+    const exp = EXPERIENCE.find(([k]) => norm(experience).includes(norm(k)));
+    const idea = formParts(r.idea).join(' / ');
+    let industry = uniq(formParts(r.industry).flatMap(splitList));
+    if (industry.includes('אחר')) {
+      const note = String(r.industryNote ?? '').trim();
+      industry = industry.filter((x) => x !== 'אחר').concat(note ? [note] : []);
+    }
+    let skills = splitList(r.skills);
+    if (!skills.length && (exp || r.experience != null)) skills = [SIDE_SKILL[side], exp?.[1]].filter(Boolean);
+    let seekSkills = splitList(r.seekSkills);
+    if (!seekSkills.length && r.experience != null) {
+      seekSkills = side === 'tech' ? ['עסקי'] : side === 'business' ? ['פיתוח'] : ['פיתוח', 'עסקי'];
+    }
     return {
       id,
       name: String(r.name).trim(),
       email: String(r.email ?? '').trim(),
-      phone: String(r.phone ?? '').trim(),
-      side: mapVal('side', r.side, 'both'),
+      phone: normPhone(r.phone),
+      side,
       status: mapVal('status', r.status, 'confirmed'),
-      brings: String(r.brings ?? '').trim(),
+      brings: String(r.brings ?? '').trim() || experience,
       seeking: String(r.seeking ?? '').trim(),
-      skills: splitList(r.skills),
-      seekSkills: splitList(r.seekSkills),
-      industry: splitList(r.industry),
-      stage: mapVal('stage', r.stage, 'none'),
+      idea,
+      skills,
+      seekSkills,
+      industry,
+      stage: r.stage != null ? mapVal('stage', r.stage, 'none') : exp?.[2] || (idea ? 'idea' : 'none'),
       ventureMode: mapVal('ventureMode', r.ventureMode, 'flex'),
       openToJoin: truthy(r.openToJoin),
       availability: mapVal('availability', r.availability, 'part'),
@@ -133,7 +203,7 @@ function downloadBlob(content, filename, type) {
 const downloadCSV = (ws, filename) => downloadBlob('﻿' + XLSX.utils.sheet_to_csv(ws), filename, 'text/csv;charset=utf-8');
 
 export const TEMPLATE_HEADERS = [
-  'id', 'name', 'email', 'phone', 'side', 'status', 'brings', 'seeking', 'skills', 'seek_skills',
+  'id', 'name', 'email', 'phone', 'side', 'status', 'brings', 'seeking', 'idea', 'skills', 'seek_skills',
   'industry', 'stage', 'venture_mode', 'open_to_join', 'availability', 'preferences', 'must_match', 'exclude',
 ];
 
@@ -141,7 +211,7 @@ export function participantRows(participants, constraints = { must: [], exclude:
   const pairsOf = (list, id) => list.filter((p) => p.includes(id)).map(([a, b]) => (a === id ? b : a));
   return participants.map((p) => ({
     id: p.id, name: p.name, email: p.email, phone: p.phone, side: p.side, status: p.status,
-    brings: p.brings, seeking: p.seeking, skills: joinList(p.skills), seek_skills: joinList(p.seekSkills),
+    brings: p.brings, seeking: p.seeking, idea: p.idea || '', skills: joinList(p.skills), seek_skills: joinList(p.seekSkills),
     industry: joinList(p.industry), stage: p.stage, venture_mode: p.ventureMode, open_to_join: p.openToJoin ? 'yes' : 'no',
     availability: p.availability,
     preferences: (p.prefs || []).map((x) => (x.rank ? `${x.id}:${x.rank}` : x.id)).join('; '),
@@ -168,8 +238,11 @@ export function exportParticipants(participants, constraints) {
   XLSX.writeFile(wb, `matchpoint-participants-${stamp()}.xlsx`);
 }
 
+// one-line summary of a partner: their venture idea if they have one, else what they bring
+export const profileLine = (p) => p.idea || p.brings || '';
+
 export const shortProfile = (p, len = 70) => {
-  const t = `${SIDES[p.side]?.en || ''} · ${p.brings || ''}`;
+  const t = `${SIDES[p.side]?.en || ''} · ${profileLine(p)}`;
   return t.length > len ? `${t.slice(0, len - 1)}…` : t;
 };
 
@@ -235,7 +308,7 @@ export function whatsappText(p, meetings, byId, settings) {
   const slots = personalSchedule(p, meetings, byId, settings);
   const lines = slots.map((s) =>
     s.partner
-      ? `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — ${s.partner.name} (${s.partner.brings ? s.partner.brings.slice(0, 60) : SIDES[s.partner.side]?.he})`
+      ? `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — ${s.partner.name} (${SIDES[s.partner.side]?.he}${profileLine(s.partner) ? ` · ${profileLine(s.partner).slice(0, 60)}${profileLine(s.partner).length > 60 ? '…' : ''}` : ''})`
       : `▫️ סבב ${s.round} · ${s.time} · נטוורקינג חופשי ☕`,
   );
   return [
