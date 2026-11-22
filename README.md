@@ -38,6 +38,6 @@ npm run build
 - `api/_lib/` – storage (Upstash / in-memory) and helpers
 - `src/participant/` – mobile participant page
 - `src/engine/scoring.js` – hard filters + 0–100 pair score (weights 45/25/15/10/5) + explainability tags
-- `src/engine/scheduler.js` – per-round weighted matching (fairness + scarcity boosts) with local search
+- `src/engine/scheduler.js` – rounds 1–3: everyone seated every round (good matches first, then the highest profile score, same side only if needed – never random); later rounds: good matches only, otherwise free networking; local search + Wildcard
 - `src/lib/io.js` – CSV/XLSX import (incl. the Google Form registration export), exports, WhatsApp texts
 - `src/tabs/*` – the 6 staff tabs; `src/data/demo.js` – 24 demo participants

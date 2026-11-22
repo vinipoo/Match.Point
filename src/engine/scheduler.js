@@ -46,7 +46,6 @@ export function schedule({ participants, scores, settings, constraints, existing
   const R = Number(settings.rounds);
   const T = Number(settings.tables);
   const thr = Number(settings.threshold);
-  const minM = Number(settings.minMeetings);
   const active = new Set(activeIds(participants, settings));
   const ids = [...active];
   const startRound = mode === 'preserve' ? Math.max(1, Math.min(R, Number(settings.currentRound) || 1)) : 1;
@@ -57,7 +56,7 @@ export function schedule({ participants, scores, settings, constraints, existing
   const seat = Array.from({ length: R + 2 }, () => ({})); // round -> id -> table
   const met = new Set();
   const count = Object.fromEntries(ids.map((id) => [id, 0]));
-  const log = { mode, kept: 0, dropped: 0, must: 0, auto: 0, fallback: 0, unplacedMust: [] };
+  const log = { mode, kept: 0, dropped: 0, must: 0, auto: 0, fallback: 0, wildcard: 0, unplacedMust: [] };
 
   const freeTable = (r, prefer = []) => {
     for (const t of prefer) if (t && t <= T && !used[r].has(t)) return t;
@@ -106,43 +105,68 @@ export function schedule({ participants, scores, settings, constraints, existing
   }
 
   // 3 — round-by-round optimisation
-  const eligible = (x, y, floor) => {
+  //   Rounds 1..K ("minimum block", K = minMeetings, default 3): try to seat EVERY free person each
+  //   round, so everyone gets K consecutive meetings at the start of the evening. Good matches
+  //   (above the threshold, mutual picks first) win; anyone left without one is completed with the
+  //   highest-scoring candidate by profile/form (role, skills, stage, availability, domain) –
+  //   never a random draw. Same-side pairs are used only when no cross-side partner is free.
+  //   Rounds K+1..R: only good matches; people still below K are topped up first; everyone else
+  //   who has no suitable partner gets free networking (extra meetings already earned are kept).
+  const K = Math.max(1, Math.min(R, Number(settings.minMeetings) || 3));
+  const allowSameSideFill = settings.fairnessFallback !== false;
+
+  const quality = (x, y) => {
     const k = pairKey(x, y);
     const e = scores.get(k);
-    if (!e || e.blocked || met.has(k) || e.score < floor) return null;
+    return e && !e.blocked && !met.has(k) && e.score >= thr ? e : null;
+  };
+  const profileFill = (x, y) => {
+    const k = pairKey(x, y);
+    const e = scores.get(k);
+    if (!e || met.has(k)) return null;
+    if (e.blocked && !(allowSameSideFill && e.blocked === 'sameSide')) return null; // exclusions / venture rule stay hard
     return e;
   };
 
-  const matchRound = (r, floor, filterFn, source) => {
+  const matchRound = (r) => {
     const cap = T - used[r].size;
     if (cap <= 0) return;
     const free = ids.filter((id) => !busy[r].has(id));
+    if (free.length < 2) return;
+    const inBlock = r <= K;
     const remaining = R - r + 1;
-    // scarcity: how many quality partners are still available to each person overall
+    const below = (id) => (count[id] || 0) < K;
     const opts = {};
-    for (const x of free) opts[x] = ids.reduce((n, o) => n + (o !== x && eligible(x, o, thr) ? 1 : 0), 0);
+    for (const x of free) opts[x] = ids.reduce((n, o) => n + (o !== x && quality(x, o) ? 1 : 0), 0);
     const fair = (id) => {
-      const c = count[id] || 0;
-      if (c < minM) return 18 * (minM - c) * (remaining <= minM - c + 1 ? 2 : 1);
-      return -2 * (c - minM); // gently spread popular people
+      const d = K - (count[id] || 0);
+      if (d > 0) return 25 * d * (remaining <= d ? 2 : 1); // running out of rounds -> urgent
+      return -2 * (-d); // gently spread popular people
     };
+
     const W = new Map();
     const edges = [];
     for (let i = 0; i < free.length; i++) {
       for (let j = i + 1; j < free.length; j++) {
         const x = free[i];
         const y = free[j];
-        const e = eligible(x, y, floor);
-        if (!e || (filterFn && !filterFn(x, y))) continue;
-        const w = e.score + (e.prefKind === 'mutual' ? 12 : 0) + fair(x) + fair(y) + 10 / Math.max(1, opts[x]) + 10 / Math.max(1, opts[y]);
-        const ed = { x, y, e, w };
+        let e = quality(x, y);
+        let tier = 'auto';
+        if (!e && (inBlock || below(x) || below(y))) {
+          e = profileFill(x, y);
+          tier = 'fallback';
+        }
+        if (!e) continue;
+        const w = e.score + (tier === 'auto' ? 40 : 0) + (e.prefKind === 'mutual' ? 15 : 0)
+          + fair(x) + fair(y) + 10 / Math.max(1, opts[x]) + 10 / Math.max(1, opts[y]);
+        const ed = { x, y, e, w, tier };
         edges.push(ed);
         W.set(pairKey(x, y), ed);
       }
     }
     edges.sort((p, q) => q.w - p.w);
 
-    let chosen = [];
+    const chosen = [];
     const taken = new Set();
     for (const ed of edges) {
       if (chosen.length >= cap) break;
@@ -151,39 +175,52 @@ export function schedule({ participants, scores, settings, constraints, existing
       chosen.push(ed);
     }
 
-    // local search
-    for (let iter = 0; iter < 60; iter++) {
+    // local search: better pairings (2-swap) and more people seated (augmenting replacements)
+    for (let iter = 0; iter < 120; iter++) {
       let improved = false;
-      // a) 2-swap exchange between two chosen meetings
-      outer: for (let i = 0; i < chosen.length; i++) {
-        for (let j = i + 1; j < chosen.length; j++) {
-          const A = chosen[i];
-          const B = chosen[j];
-          const cur = A.w + B.w;
-          for (const [p, q] of [[[A.x, B.x], [A.y, B.y]], [[A.x, B.y], [A.y, B.x]]]) {
-            const e1 = W.get(pairKey(...p));
-            const e2 = W.get(pairKey(...q));
-            if (e1 && e2 && e1.w + e2.w > cur + 0.01) {
-              chosen[i] = e1; chosen[j] = e2;
-              improved = true;
-              break outer;
+      // a) seat more people first: (a,b) + idle u,v -> (a,u) + (b,v)
+      if (chosen.length < cap) {
+        const inUse = new Set(chosen.flatMap((c) => [c.x, c.y]));
+        const idle = free.filter((id) => !inUse.has(id));
+        // direct pair between two idle people
+        outer0: for (let i = 0; i < idle.length; i++) {
+          for (let j = i + 1; j < idle.length; j++) {
+            const e = W.get(pairKey(idle[i], idle[j]));
+            if (e) { chosen.push(e); improved = true; break outer0; }
+          }
+        }
+        if (!improved) {
+          outer1: for (let i = 0; i < chosen.length; i++) {
+            const A = chosen[i];
+            for (const [p, q] of [[A.x, A.y], [A.y, A.x]]) {
+              for (const u of idle) {
+                const e1 = W.get(pairKey(p, u));
+                if (!e1) continue;
+                for (const v of idle) {
+                  if (u === v) continue;
+                  const e2 = W.get(pairKey(q, v));
+                  if (e2) { chosen.splice(i, 1, e1, e2); improved = true; break outer1; }
+                }
+              }
             }
           }
         }
       }
-      // b) augmenting: (a,b) + idle u,v  ->  (a,u) + (b,v)  — one more meeting
-      if (!improved && chosen.length < cap) {
-        const inUse = new Set(chosen.flatMap((c) => [c.x, c.y]));
-        const idle = free.filter((id) => !inUse.has(id));
+      // b) 2-swap exchange between two chosen meetings for a higher total
+      if (!improved) {
         outer2: for (let i = 0; i < chosen.length; i++) {
-          const A = chosen[i];
-          for (const u of idle) {
-            const e1 = W.get(pairKey(A.x, u));
-            if (!e1) continue;
-            for (const v of idle) {
-              if (u === v) continue;
-              const e2 = W.get(pairKey(A.y, v));
-              if (e2) { chosen.splice(i, 1, e1, e2); improved = true; break outer2; }
+          for (let j = i + 1; j < chosen.length; j++) {
+            const A = chosen[i];
+            const B = chosen[j];
+            const cur = A.w + B.w;
+            for (const [p, q] of [[[A.x, B.x], [A.y, B.y]], [[A.x, B.y], [A.y, B.x]]]) {
+              const e1 = W.get(pairKey(...p));
+              const e2 = W.get(pairKey(...q));
+              if (e1 && e2 && e1.w + e2.w > cur + 0.01) {
+                chosen[i] = e1; chosen[j] = e2;
+                improved = true;
+                break outer2;
+              }
             }
           }
         }
@@ -196,29 +233,15 @@ export function schedule({ participants, scores, settings, constraints, existing
     for (const ed of chosen) {
       const t = freeTable(r, [seat[r - 1]?.[ed.x], seat[r - 1]?.[ed.y]]);
       if (!t) break;
-      place({ id: newId(), round: r, table: t, a: ed.x, b: ed.y, score: ed.e.score, locked: false, source });
-      log[source]++;
+      place({ id: newId(), round: r, table: t, a: ed.x, b: ed.y, score: ed.e.score, locked: false, source: ed.tier });
+      log[ed.tier]++;
     }
   };
 
   // Wildcard round: controlled-random complementary pairs (Tech ↔ Business), ignoring explicit picks
   const wild = settings.wildcardEnabled ? Number(settings.wildcardRound) : null;
-  const isWild = (r) => wild !== null && r === wild;
   log.wildcard = 0;
-
-  for (let r = startRound; r <= R; r++) if (!isWild(r)) matchRound(r, thr, null, 'auto');
-
-  // 4 — fairness fallback: lower the bar only for under-served people
-  if (settings.fairnessFallback) {
-    const floor = thr - Number(settings.fallbackDrop || 0);
-    for (let r = startRound; r <= R; r++) {
-      if (isWild(r)) continue;
-      matchRound(r, floor, (x, y) => (count[x] || 0) < minM || (count[y] || 0) < minM, 'fallback');
-    }
-  }
-
-  if (wild !== null && wild >= startRound && wild <= R) {
-    const r = wild;
+  const wildcardRound = (r) => {
     const rand = rng(settings.wildcardSeed);
     const free = ids.filter((id) => !busy[r].has(id));
     const sideOf = Object.fromEntries(participants.map((p) => [p.id, p.side]));
@@ -230,24 +253,24 @@ export function schedule({ participants, scores, settings, constraints, existing
     const tech = shuffle(free.filter((id) => sideOf[id] === 'tech'), rand);
     const biz = shuffle(free.filter((id) => sideOf[id] === 'business'), rand);
     const both = shuffle(free.filter((id) => sideOf[id] === 'both'), rand);
-    // smaller group first so as many people as possible get a surprise partner
     const [few, many] = tech.length <= biz.length ? [tech, biz] : [biz, tech];
     const pool = [...many, ...both];
     const taken = new Set();
-    const pairs = [];
     for (const x of [...few, ...both]) {
       if (taken.has(x)) continue;
       const y = pool.find((cand) => cand !== x && !taken.has(cand) && sideOf[cand] !== sideOf[x] && ok(x, cand));
       if (!y) continue;
-      taken.add(x); taken.add(y);
-      pairs.push([x, y]);
-    }
-    for (const [x, y] of pairs) {
       const t = freeTable(r, [seat[r - 1]?.[x], seat[r - 1]?.[y]]);
       if (!t) break;
+      taken.add(x); taken.add(y);
       place({ id: newId(), round: r, table: t, a: x, b: y, score: scores.get(pairKey(x, y))?.score ?? 0, locked: false, source: 'wildcard' });
       log.wildcard++;
     }
+  };
+
+  for (let r = startRound; r <= R; r++) {
+    if (wild === r) wildcardRound(r); // surprise pairs first; anyone left over is completed by score below
+    matchRound(r);
   }
 
   meetings.sort((x, y) => x.round - y.round || x.table - y.table);
@@ -280,6 +303,14 @@ export function scheduleStats(meetings, active, settings, scores) {
     mutualTotal,
     zero: active.filter((id) => !count[id]),
     under: active.filter((id) => (count[id] || 0) < settings.minMeetings),
+    // the first K rounds should all be meetings ("minimum block")
+    earlyGap: (() => {
+      const K = Math.min(Number(settings.minMeetings) || 3, Number(settings.rounds));
+      const early = {};
+      for (const m of meetings) if (m.round <= K) { early[m.a] = (early[m.a] || 0) + 1; early[m.b] = (early[m.b] || 0) + 1; }
+      return active.filter((id) => (early[id] || 0) < K);
+    })(),
+    sameSideFill: meetings.filter((m) => m.source === 'fallback' && scores.get(pairKey(m.a, m.b))?.blocked === 'sameSide').length,
     max: vals.length ? Math.max(...vals) : 0,
     min: vals.length ? Math.min(...vals) : 0,
   };
@@ -323,6 +354,7 @@ export function analyzeGaps(participants, active, scores, settings) {
     options,
     rescueCount: weak.filter((w) => w.rescue > 0).length,
     tablesShort: Number(settings.tables) * 2 < act.length,
+    tablesNeeded: Math.ceil(act.length / 2),
     maxPerRound,
   };
 }

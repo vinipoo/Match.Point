@@ -67,8 +67,16 @@ export default function EngineTab(props) {
             label="סינון מיזם מול מיזם" hint="לא לשבץ שני יזמים עם מיזם קיים כשאף אחד מהם לא מוכן להצטרף למיזם של האחר." />
           <Toggle checked={settings.allowSameSide} onChange={(v) => setSettings({ allowSameSide: v })}
             label="אפשר התאמות משלימות בתוך אותו צד" hint="Tech-Tech / Biz-Biz לפי כישורים משלימים – מומלץ כשיש פער מספרי." />
+          <div style={{ padding: '8px 10px', background: 'var(--soft)', borderInlineStart: '4px solid var(--lime)', margin: '6px 0' }}>
+            <div style={{ fontWeight: 700 }}>מינימום <M>{settings.minMeetings}</M> פגישות רצופות בתחילת הערב</div>
+            <div className="small muted">
+              בסבבים <M>1–{Math.min(settings.minMeetings, settings.rounds)}</M> המנוע מנסה לשבץ את כולם בכל סבב: קודם התאמות טובות ובחירות הדדיות,
+              ומי שאין לו מספיק – מושלם מול המועמדים עם הציון הגבוה ביותר לפי הטופס והפרופיל (תפקיד, כישורים, שלב מיזם, זמינות ותחום), לא בהגרלה.
+              אחר כך משובצות רק התאמות טובות; סבבים בלי פרטנר מתאים מסומנים כנטוורקינג חופשי.
+            </div>
+          </div>
           <Toggle checked={settings.fairnessFallback} onChange={(v) => setSettings({ fairnessFallback: v })}
-            label="רשת ביטחון להגינות" hint={`למי שיש פחות מ-${settings.minMeetings} פגישות: הורדת הסף ב-${settings.fallbackDrop} נק׳.`} />
+            label="בהשלמת המינימום – מותר מאותו צד" hint="כשאין פרטנר פנוי מהצד השני (למשל יותר עסקיים מטכנולוגיים), להשלים מול המועמד הטוב ביותר מאותו צד עם כישורים משלימים." />
           <div style={{ marginTop: 6, padding: '8px 10px', border: '1.5px dashed var(--mag)' }}>
             <Toggle checked={settings.wildcardEnabled} onChange={(v) => setSettings({ wildcardEnabled: v })}
               label={<>סבב הפתעה <M>Wildcard</M></>}
@@ -87,15 +95,10 @@ export default function EngineTab(props) {
           </div>
           <div className="fields" style={{ marginTop: 10 }}>
             <label className="field">
-              <span>יעד פגישות מינימלי לאדם</span>
+              <span>מינימום פגישות רצופות בהתחלה</span>
               <select className="select mono" value={settings.minMeetings} onChange={(e) => setSettings({ minMeetings: Number(e.target.value) })}>
-                {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
-            </label>
-            <label className="field">
-              <span>הורדת סף בהגינות</span>
-              <input className="input mono" type="number" min={0} max={40} value={settings.fallbackDrop}
-                onChange={(e) => setSettings({ fallbackDrop: Math.max(0, Math.min(40, Number(e.target.value) || 0)) })} />
             </label>
           </div>
         </Card>
@@ -130,7 +133,7 @@ export default function EngineTab(props) {
           )}
           {lastRun && (
             <div className="small mono muted">
-              LAST RUN {new Date(lastRun.at).toLocaleTimeString('he-IL')} · {lastRun.mode} · kept {lastRun.kept} · dropped {lastRun.dropped} · must {lastRun.must} · auto {lastRun.auto} · fairness {lastRun.fallback}{lastRun.wildcard ? ` · wildcard ${lastRun.wildcard}` : ''}
+              LAST RUN {new Date(lastRun.at).toLocaleTimeString('he-IL')} · {lastRun.mode} · kept {lastRun.kept} · dropped {lastRun.dropped} · must {lastRun.must} · quality {lastRun.auto} · profile-fill {lastRun.fallback}{lastRun.wildcard ? ` · wildcard ${lastRun.wildcard}` : ''}
             </div>
           )}
           {lastRun?.unplacedMust?.length > 0 && (
@@ -138,11 +141,21 @@ export default function EngineTab(props) {
               {lastRun.unplacedMust.map(([a, b, why]) => `${byId[a]?.name || a} ↔ ${byId[b]?.name || b} (${why})`).join(' · ')}
             </Alert>
           )}
-          {meetings.length > 0 && stats.under.length > 0 && (
-            <Alert tone="warn" icon={stats.under.length} title={`מתחת ליעד של ${settings.minMeetings} פגישות`}>
-              {stats.under.map((id) => `${byId[id]?.name} (${stats.count[id] || 0})`).join(' · ')}
+          {meetings.length > 0 && (stats.earlyGap.length === 0 ? (
+            <Alert tone="ok" icon="✓" title={`לכל המשתתפים יש ${settings.minMeetings} פגישות רצופות בסבבים 1–${Math.min(settings.minMeetings, settings.rounds)}`}>
+              {stats.sameSideFill > 0 ? `${stats.sameSideFill} מהן הושלמו מאותו צד לפי הפרופיל (אין מספיק פרטנרים מהצד השני).` : 'כולן מול הצד המשלים.'}
             </Alert>
-          )}
+          ) : (
+            <Alert tone="warn" icon={stats.earlyGap.length} title={`לא קיבלו ${settings.minMeetings} פגישות רצופות בהתחלה`}>
+              {stats.earlyGap.map((id) => `${byId[id]?.name} (${stats.count[id] || 0} סה״כ)`).join(' · ')}
+              <div style={{ marginTop: 4 }}>
+                {gaps.tablesNeeded > settings.tables
+                  ? `הסיבה: חסרים שולחנות – צריך לפחות ${gaps.tablesNeeded} כדי לשבץ את כולם בכל סבב (מוגדרים ${settings.tables}).`
+                  : gaps.total % 2 ? 'מספר המשתתפים אי-זוגי, כך שבכל סבב אחד נשאר בלי פרטנר – הוא מקבל עדיפות בסבב הבא.'
+                  : 'אין מספיק פרטנרים מותרים (החרגות / כלל מיזם מול מיזם / השלמה מאותו צד כבויה).'}
+              </div>
+            </Alert>
+          ))}
         </div>
       </Card>
 

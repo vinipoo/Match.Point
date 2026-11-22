@@ -127,7 +127,7 @@ export function explain(m, scores) {
       else if (c.industry > 0 && !parts.includes('תחום משותף')) parts.push('תחום משותף');
     }
   }
-  if (m.source === 'fallback') { parts.unshift('הגינות'); kind = 'fair'; }
+  if (m.source === 'fallback') { parts.unshift(e?.blocked === 'sameSide' ? 'השלמה לפי פרופיל (אותו צד)' : 'השלמה לפי פרופיל'); kind = 'fair'; }
   if (!parts.length) parts.push('התאמה כללית');
   return { label: parts.join(' + '), score, kind };
 }

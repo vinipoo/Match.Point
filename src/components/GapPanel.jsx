@@ -29,6 +29,7 @@ export default function GapPanel({ gaps, settings, setSettings, num = 'GAP' }) {
           {tablesShort && (
             <Alert tone="warn" icon="!" title="אין מספיק שולחנות">
               <M>{settings.tables}</M> שולחנות מאפשרים עד <M>{settings.tables * 2}</M> משתתפים בסבב, אבל יש <M>{total}</M> פעילים.
+              כדי שכולם יקבלו <M>{settings.minMeetings}</M> פגישות רצופות בהתחלה צריך לפחות <M>{gaps.tablesNeeded}</M> שולחנות.
             </Alert>
           )}
 
@@ -52,11 +53,10 @@ export default function GapPanel({ gaps, settings, setSettings, num = 'GAP' }) {
                   </span>
                 ))}
               </div>
-              {settings.fairnessFallback && (
-                <div className="muted" style={{ marginTop: 6 }}>
-                  כלל ההגינות פעיל: עבורם יורד הסף ב-<M>{settings.fallbackDrop}</M> נק׳ כדי להבטיח פגישות.
-                </div>
-              )}
+              <div className="muted" style={{ marginTop: 6 }}>
+                הם עדיין יקבלו <M>{settings.minMeetings}</M> פגישות רצופות בהתחלה: ההשלמה נעשית מול המועמדים עם הציון הגבוה ביותר לפי הטופס והפרופיל
+                {settings.fairnessFallback ? ' (כולל מאותו צד, אם אין פרטנר מהצד השני)' : ''}.
+              </div>
             </Alert>
           ) : (
             <Alert tone="ok" icon="✓" title="לכל המשתתפים יש מספיק התאמות איכותיות">

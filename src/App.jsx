@@ -30,7 +30,11 @@ export default function App() {
   const saved = useMemo(loadState, []);
   const [tab, setTab] = useState(saved?.tab || 'setup');
   const [participants, setParticipants] = useState(saved?.participants || []);
-  const [settings, setSettingsRaw] = useState({ ...DEFAULT_SETTINGS, ...(saved?.settings || {}) });
+  const [settings, setSettingsRaw] = useState(() => {
+    const s = { ...DEFAULT_SETTINGS, ...(saved?.settings || {}) };
+    // engine v2: minimum of 3 consecutive meetings at the start replaces the old "2 + lower threshold" rule
+    return saved?.settings?.engineVersion === 2 ? s : { ...s, minMeetings: 3, engineVersion: 2 };
+  });
   const [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS, ...(saved?.weights || {}) });
   const [constraints, setConstraints] = useState(saved?.constraints || { must: [], exclude: [] });
   const [meetings, setMeetings] = useState(saved?.meetings || []);
