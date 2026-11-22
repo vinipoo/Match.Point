@@ -88,21 +88,47 @@ const mapVal = (field, v, def) => {
 };
 const truthy = (v) => ['1', 'true', 'yes', 'y', 'כן', 'v', '✓', '✔', 'x', 'הציג', 'הציגה'].includes(norm(v));
 
+// which participant field a column header maps to (exact alias, or prefix of a long form question)
+const fieldOf = (h) => {
+  const n = norm(h).replace(/_\d+$/, '');
+  if (!n) return null;
+  for (const [f, al] of Object.entries(ALIASES)) if (al.some((a) => norm(a) === n)) return f;
+  for (const [f, prefix] of PREFIX_ALIASES) if (n.startsWith(norm(prefix))) return f;
+  return null;
+};
+
+// Find the real header row: exports often start with a title row ("ספידייט שותפים 2026"),
+// so scan the first rows of every sheet and use the row that matches the most known columns.
+export function sheetToRows(wb) {
+  let best = null;
+  for (const name of wb.SheetNames) {
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '', blankrows: false });
+    for (let i = 0; i < Math.min(15, aoa.length); i++) {
+      const fields = new Set(aoa[i].map(fieldOf).filter(Boolean));
+      const hasName = fields.has('name') || fields.has('firstName');
+      const score = fields.size + (hasName ? 5 : 0);
+      if (!best || score > best.score) best = { score, aoa, i };
+    }
+  }
+  if (!best || best.score === 0) return [];
+  const seen = {};
+  const head = best.aoa[best.i].map((h, j) => {
+    const base = String(h ?? '').trim() || `__col${j}`;
+    seen[base] = (seen[base] || 0) + 1;
+    return seen[base] > 1 ? `${base}_${seen[base] - 1}` : base; // same suffix style as SheetJS
+  });
+  return best.aoa.slice(best.i + 1).map((r) => Object.fromEntries(head.map((h, j) => [h, r[j] ?? ''])));
+}
+
 export async function readFile(file) {
   let wb;
   if (/\.csv$/i.test(file.name)) wb = XLSX.read(await file.text(), { type: 'string' });
   else wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '' });
+  return sheetToRows(wb);
 }
 
 export function mapRows(rows) {
   const warnings = [];
-  const fieldOf = (h) => {
-    const n = norm(h).replace(/_\d+$/, '');
-    for (const [f, al] of Object.entries(ALIASES)) if (al.some((a) => norm(a) === n)) return f;
-    for (const [f, prefix] of PREFIX_ALIASES) if (n.startsWith(norm(prefix))) return f;
-    return null;
-  };
   const recs = [];
   const seen = new Set();
   rows.forEach((row, i) => {
@@ -112,9 +138,9 @@ export function mapRows(rows) {
       // duplicate columns (e.g. the same question for Tech and for Business): keep the filled one
       if (f && (String(v ?? '').trim() || r[f] == null)) r[f] = v;
     }
-    if (!String(r.name ?? '').trim()) {
-      r.name = [r.firstName, r.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ');
-    }
+    // first + last name win over a generic "Name" column (some exports put a row label there)
+    const fullName = [r.firstName, r.lastName].map((x) => String(x ?? '').trim()).filter(Boolean).join(' ');
+    if (fullName) r.name = fullName;
     if (!String(r.name ?? '').trim()) {
       if (Object.values(row).some((v) => String(v ?? '').trim())) warnings.push(`שורה ${i + 2}: חסר שם – השורה דולגה`);
       return;
