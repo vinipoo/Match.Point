@@ -271,8 +271,9 @@ function Portal({ token, onLogout, onInvalid }) {
     return all.filter((x) => x !== 'אחר').sort().concat(all.includes('אחר') ? ['אחר'] : []);
   }, [roster]);
   const me = data?.me;
+  // complementary side: Tech sees Business (+ hybrid), Business sees Tech (+ hybrid), hybrid sees everyone
   const looksForMe = useCallback(
-    (p) => !me || me.side === 'both' || ['any', 'both', me.side].includes(p.seeksSide || 'any'),
+    (p) => !me || me.side === 'both' || p.side === 'both' || p.side !== me.side,
     [me],
   );
 
@@ -413,7 +414,7 @@ function Portal({ token, onLogout, onInvalid }) {
           <div className="pp-stack">
             <input className="input" placeholder="חיפוש חופשי: שם, מזהה, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
             <div className="pp-filters">
-              <button className={`btn btn-sm ${forMe ? 'btn-lime' : ''}`} aria-pressed={forMe} onClick={() => setForMe((v) => !v)}>🎯 התאמות שמחפשות אותי</button>
+              <button className={`btn btn-sm ${forMe ? 'btn-lime' : ''}`} aria-pressed={forMe} onClick={() => setForMe((v) => !v)}>🎯 הצג שותפים מהצד המשלים</button>
               <div className="seg" role="group" aria-label="Pitch">
                 <button className={!pitchOnly ? 'on confirmed' : ''} onClick={() => setPitchOnly(false)}>כולם</button>
                 <button className={pitchOnly ? 'on no_show' : ''} onClick={() => setPitchOnly(true)}>רק מציגי <M>Pitch</M></button>
