@@ -31,7 +31,9 @@ const VM = {
   flex: { own: 0.8, join: 0.7, new: 0.9, flex: 0.8 },
 };
 const AV = { full: 3, part: 2, evenings: 1 };
-const rankFactor = (r) => (r == null || r === 0 ? 1 : 1 - (Math.min(5, Math.max(1, r)) - 1) * 0.1);
+// priority 1 (most important) … 5; unranked picks count as a middle priority
+const RANK_FACTOR = { 1: 1, 2: 0.8, 3: 0.6, 4: 0.4, 5: 0.2 };
+const rankFactor = (r) => (r == null || r === 0 ? 0.6 : RANK_FACTOR[Math.min(5, Math.max(1, Math.round(r)))]);
 
 export function hardFilter(a, b, settings, excludeSet) {
   if (excludeSet.has(pairKey(a.id, b.id))) return 'exclude';
@@ -49,11 +51,13 @@ export function scorePair(a, b, weights) {
   const pb = (b.prefs || []).find((p) => p.id === a.id);
   let prefs = 0;
   let prefKind = 'none';
+  const rfA = pa ? rankFactor(pa.rank) : 0;
+  const rfB = pb ? rankFactor(pb.rank) : 0;
   if (pa && pb) {
-    prefs = 0.85 + 0.15 * ((rankFactor(pa.rank) + rankFactor(pb.rank)) / 2);
+    prefs = 0.7 + 0.3 * ((rfA + rfB) / 2); // mutual #1↔#1 = 1.0 … #5↔#5 = 0.76
     prefKind = 'mutual';
   } else if (pa || pb) {
-    prefs = 0.6 * rankFactor((pa || pb).rank);
+    prefs = 0.35 + 0.3 * (pa ? rfA : rfB); // one-sided #1 = 0.65 … #5 = 0.41
     prefKind = pa ? 'a' : 'b';
   }
 
@@ -80,7 +84,7 @@ export function scorePair(a, b, weights) {
   const comps = { prefs, role, venture, availability, industry };
   const wsum = Object.values(weights).reduce((s, v) => s + Number(v || 0), 0) || 1;
   const raw = Object.entries(comps).reduce((s, [k, v]) => s + Number(weights[k] || 0) * v, 0);
-  return { score: Math.round((raw / wsum) * 100), comps, prefKind, skill, sides: [a.side, b.side] };
+  return { score: Math.round((raw / wsum) * 100), comps, prefKind, skill, sides: [a.side, b.side], rfA, rfB, rankA: pa?.rank || null, rankB: pb?.rank || null };
 }
 
 export function computeScores(participants, weights, settings, constraints) {
@@ -115,8 +119,16 @@ export function explain(m, scores) {
   if (m.source === 'wildcard') return { label: 'Wildcard // היכרות מפתיעה', score, kind: 'wild' };
   const parts = [];
   let kind = 'std';
-  if (e?.prefKind === 'mutual') { parts.push('הדדי'); kind = 'mutual'; }
-  else if (e?.prefKind === 'a' || e?.prefKind === 'b') { parts.push('בחירה'); kind = 'pick'; }
+  const rk = (r) => (r ? `#${r}` : '');
+  if (e?.prefKind === 'mutual') {
+    const ranks = [e.rankA, e.rankB].filter(Boolean).sort((x, y) => x - y);
+    parts.push(ranks.length ? `הדדי ${ranks.map(rk).join('↔')}` : 'הדדי');
+    kind = 'mutual';
+  } else if (e?.prefKind === 'a' || e?.prefKind === 'b') {
+    const r = e.prefKind === 'a' ? e.rankA : e.rankB;
+    parts.push(r ? `בחירה ${rk(r)}` : 'בחירה');
+    kind = 'pick';
+  }
   const c = e?.comps || {};
   if (kind !== 'mutual' && e) {
     if (c.role >= 0.7) parts.push(complementLabel(e.sides, e.skill));
@@ -129,5 +141,6 @@ export function explain(m, scores) {
   }
   if (m.source === 'fallback') { parts.unshift(e?.blocked === 'sameSide' ? 'השלמה לפי פרופיל (אותו צד)' : 'השלמה לפי פרופיל'); kind = 'fair'; }
   if (!parts.length) parts.push('התאמה כללית');
+  if (m.c) parts.unshift('שולחן משולש');
   return { label: parts.join(' + '), score, kind };
 }

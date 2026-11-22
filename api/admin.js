@@ -88,7 +88,7 @@ export default async function handler(req, res) {
       case 'schedule': {
         if (!Array.isArray(b.meetings) || !Array.isArray(b.times)) return send(res, 400, { error: 'לוח שיבוץ חסר' });
         const schedule = {
-          meetings: b.meetings.map((m) => ({ round: Number(m.round), table: Number(m.table), a: String(m.a), b: String(m.b), wild: !!m.wild })),
+          meetings: b.meetings.map((m) => ({ round: Number(m.round), table: Number(m.table), a: String(m.a), b: String(m.b), ...(m.c ? { c: String(m.c) } : {}), wild: !!m.wild })),
           times: b.times.map((t) => ({ round: Number(t.round), start: String(t.start), end: String(t.end) })),
           hash: String(b.hash || ''),
           publishedAt: now,

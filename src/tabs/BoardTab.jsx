@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, M, SideTag, Reason, Alert, Empty } from '../components/ui';
 import { explain, pairKey, BLOCK_REASONS } from '../engine/scoring';
-import { roundTime, roundEnd } from '../engine/scheduler';
+import { roundTime, roundEnd, members } from '../engine/scheduler';
 import LivePublishBar from '../components/LivePublishBar';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -9,10 +9,9 @@ let seq = 0;
 const mid = () => `mm${Date.now().toString(36)}${(seq++).toString(36)}`;
 
 function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onTable, past }) {
-  const A = byId[m.a];
-  const B = byId[m.b];
+  const people = members(m).map((id) => byId[id]);
   const x = explain(m, scores);
-  const broken = !activeSet.has(m.a) || !activeSet.has(m.b);
+  const broken = members(m).some((id) => !activeSet.has(id));
   return (
     <div className={`tcard ${m.locked ? 'locked' : ''} ${x.kind === 'mutual' ? 'mutual' : ''} ${x.kind === 'wild' ? 'wild' : ''}`} style={broken ? { borderColor: 'var(--mag)', borderStyle: 'dashed' } : undefined}>
       <div className="tcard-h">
@@ -28,9 +27,10 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
         </div>
       </div>
       <div className="tcard-b">
-        {[A, B].map((p, i) => (
+        {m.c && <span className="tag tag-dark" style={{ alignSelf: 'flex-start' }}>שולחן משולש</span>}
+        {people.map((p, i) => (
           <div key={i}>
-            {i === 1 && <div className="vs">VS</div>}
+            {i > 0 && <div className="vs">VS</div>}
             <div className="person">
               <div className="nm">
                 {p?.name || '—'} {p && <SideTag side={p.side} />}
@@ -60,13 +60,13 @@ export default function BoardTab(props) {
   const r = Math.min(round, R);
 
   const inRound = useMemo(() => meetings.filter((m) => m.round === r).sort((a, b) => a.table - b.table), [meetings, r]);
-  const busy = new Set(inRound.flatMap((m) => [m.a, m.b]));
+  const busy = new Set(inRound.flatMap(members));
   const free = participants.filter((p) => activeSet.has(p.id) && !busy.has(p.id));
 
   const patch = (id, fn) => setMeetings((ms) => ms.map((m) => (m.id === id ? fn(m) : m)));
   const onLock = (m) => patch(m.id, (x) => ({ ...x, locked: !x.locked }));
   const onCancel = (m) => {
-    const choice = window.confirm(`לבטל את הפגישה ${byId[m.a]?.name} ↔ ${byId[m.b]?.name}?\nהזוג יוחרג כדי שלא ישובץ שוב בשיבוץ הבא.`);
+    const choice = window.confirm(`לבטל את הפגישה ${members(m).map((id) => byId[id]?.name).join(' ↔ ')}?\nהזוג יוחרג כדי שלא ישובץ שוב בשיבוץ הבא.`);
     if (!choice) return;
     setMeetings((ms) => ms.filter((x) => x.id !== m.id));
     addConstraint('exclude', m.a, m.b);
@@ -195,7 +195,7 @@ export default function BoardTab(props) {
               </thead>
               <tbody>
                 {participants.filter((p) => activeSet.has(p.id)).map((p) => {
-                  const mine = meetings.filter((m) => m.a === p.id || m.b === p.id);
+                  const mine = meetings.filter((m) => members(m).includes(p.id));
                   return (
                     <tr key={p.id}>
                       <td style={{ fontWeight: 600 }} className="nowrap">{p.name} <SideTag side={p.side} /></td>
@@ -203,11 +203,11 @@ export default function BoardTab(props) {
                       {Array.from({ length: R }, (_, i) => {
                         const m = mine.find((x) => x.round === i + 1);
                         if (!m) return <td key={i} className="slot free">נטוורקינג</td>;
-                        const other = byId[m.a === p.id ? m.b : m.a];
+                        const others = members(m).filter((id) => id !== p.id).map((id) => byId[id]);
                         const x = explain(m, scores);
                         return (
                           <td key={i} className="slot" title={`${x.label} // ${x.score}%`}>
-                            <span className="tb">{pad(m.table)}</span>{other?.name}
+                            <span className="tb">{pad(m.table)}</span>{others.map((o) => o?.name).join(' + ')}
                             {x.kind === 'mutual' && <span style={{ color: 'var(--mag)', fontWeight: 700 }}> ⇄</span>}
                           </td>
                         );

@@ -159,7 +159,7 @@ function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
       >
         {!open
           ? (rank ? <>✓ בחירה מס׳ <M>{rank}</M></> : 'הבחירה תיפתח כשהצוות יפתח את הדירוג')
-          : rank ? <>✓ בחירה מס׳ <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : `בחרת כבר ${max} – הסירו מישהו כדי להוסיף`}
+          : rank ? <>✓ עדיפות <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : `בחרת כבר ${max} – הסירו מישהו כדי להוסיף`}
       </button>
     </article>
   );
@@ -215,7 +215,7 @@ function Portal({ token, onLogout, onInvalid }) {
     const key = `mp-sched-${data.me.id}`;
     const prev = store.json(key);
     if (prev?.publishedAt === data.publishedAt) return;
-    const slots = Object.fromEntries(data.schedule.map((s) => [s.round, `${s.table ?? '-'}|${s.partner?.id ?? 'free'}`]));
+    const slots = Object.fromEntries(data.schedule.map((s) => [s.round, `${s.table ?? '-'}|${s.partner?.id ?? 'free'}|${s.partner2?.id ?? ''}`]));
     if (prev?.slots) {
       const d = new Date(Date.now() + offset.current);
       const nowMin = d.getHours() * 60 + d.getMinutes();
@@ -360,7 +360,9 @@ function Portal({ token, onLogout, onInvalid }) {
                   </div>
                   {s.partner ? (
                     <>
+                      {s.partner2 && <span className="tag tag-dark" style={{ alignSelf: 'flex-start' }}>שולחן משולש</span>}
                       <div className="pp-name">{s.partner.name} <SideTag side={s.partner.side} /></div>
+                      {s.partner2 && <div className="pp-name">+ {s.partner2.name} <SideTag side={s.partner2.side} /></div>}
                       {s.partner.industry?.length > 0 && <div className="chips">{s.partner.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>}
                       {(s.partner.idea || s.partner.brings) && <div className="small pp-clamp">{s.partner.idea || s.partner.brings}</div>}
                     </>
@@ -377,13 +379,19 @@ function Portal({ token, onLogout, onInvalid }) {
         {!isLive && view === 'mine' && (
           <div className="pp-stack">
             {list.length === 0 && <div className="pp-banner">עדיין לא בחרת אף אחד. עברו ל״משתתפים״ ולחצו ״רוצה לפגוש״.</div>}
+            {list.length > 0 && (
+              <div className="pp-banner">
+                <b>סדר עדיפות:</b> <M>1</M> = הכי חשוב לי. {isOpen ? 'שנו את הסדר עם החצים ▲▼ – עדיפות גבוהה מקבלת משקל גבוה יותר בשיבוץ.' : 'הסדר נשמר כפי ששלחת.'}
+              </div>
+            )}
             {list.map((id, i) => {
               const p = byId[id];
               if (!p) return null;
               return (
                 <div key={id} className="pp-rank">
-                  <M className="pp-rank-no">{i + 1}</M>
+                  <M className="pp-rank-no" aria-label={`עדיפות ${i + 1}`}>{i + 1}</M>
                   <div className="pp-rank-body">
+                    <div className="small" style={{ fontWeight: 700 }}>עדיפות {i + 1}{i === 0 ? ' · הכי חשוב' : ''}</div>
                     <div className="pp-name">{p.name} <SideTag side={p.side} /></div>
                     {(p.idea || p.brings) && <div className="small muted pp-clamp">{p.idea || p.brings}</div>}
                   </div>

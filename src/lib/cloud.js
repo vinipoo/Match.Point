@@ -40,7 +40,7 @@ export const participantLink = (token) =>
 // stable fingerprint of a board, to know whether it changed since publishing
 export function boardHash(meetings) {
   const s = [...meetings]
-    .map((m) => `${m.round}.${m.table}.${[m.a, m.b].sort().join('-')}`)
+    .map((m) => `${m.round}.${m.table}.${[m.a, m.b, m.c].filter(Boolean).sort().join('-')}`)
     .sort()
     .join('|');
   let h = 5381;

@@ -34,7 +34,7 @@ export default function EngineTab(props) {
       .sort((x, y) => (x.e.blocked ? 1 : 0) - (y.e.blocked ? 1 : 0) || y.e.score - x.e.score);
   }, [focus, participants, scores]);
 
-  const metWith = useMemo(() => new Set(meetings.filter((m) => m.a === focus || m.b === focus).map((m) => (m.a === focus ? m.b : m.a))), [meetings, focus]);
+  const metWith = useMemo(() => new Set(meetings.filter((m) => [m.a, m.b, m.c].includes(focus)).flatMap((m) => [m.a, m.b, m.c].filter((id) => id && id !== focus))), [meetings, focus]);
 
   if (!participants.length) return <Empty title="אין נתונים להרצה">טענו משתתפים בלשונית <M>01</M>.</Empty>;
 

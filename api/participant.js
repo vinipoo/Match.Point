@@ -35,9 +35,11 @@ export default async function handler(req, res) {
       if (phase === 'published' && schedule) {
         const byId = Object.fromEntries(roster.map((p) => [p.id, p]));
         mySchedule = schedule.times.map((t) => {
-          const m = schedule.meetings.find((x) => x.round === t.round && (x.a === me.id || x.b === me.id));
-          const partner = m ? byId[m.a === me.id ? m.b : m.a] || null : null;
-          return { ...t, table: m?.table ?? null, partner, wild: !!m?.wild };
+          const m = schedule.meetings.find((x) => x.round === t.round && [x.a, x.b, x.c].includes(me.id));
+          const others = m ? [m.a, m.b, m.c].filter((id) => id && id !== me.id).map((id) => byId[id]).filter(Boolean) : [];
+          const partner = others[0] || null;
+          const partner2 = others[1] || null; // three-person table
+          return { ...t, table: m?.table ?? null, partner, partner2, wild: !!m?.wild };
         });
       }
       return send(res, 200, {

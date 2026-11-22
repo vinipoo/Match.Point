@@ -277,14 +277,15 @@ export const shortProfile = (p, len = 70) => {
 export function personalSchedule(p, meetings, byId, settings) {
   return Array.from({ length: Number(settings.rounds) }, (_, i) => {
     const r = i + 1;
-    const m = meetings.find((x) => x.round === r && (x.a === p.id || x.b === p.id));
-    const partner = m ? byId[m.a === p.id ? m.b : m.a] : null;
-    return { round: r, time: roundTime(settings, r), table: m?.table ?? null, partner, meeting: m || null };
+    const m = meetings.find((x) => x.round === r && [x.a, x.b, x.c].includes(p.id));
+    const partners = m ? [m.a, m.b, m.c].filter((id) => id && id !== p.id).map((id) => byId[id]).filter(Boolean) : [];
+    return { round: r, time: roundTime(settings, r), table: m?.table ?? null, partner: partners[0] || null, partners, meeting: m || null };
   });
 }
 
 export function scheduleCell(slot) {
   if (!slot.partner) return 'נטוורקינג חופשי';
+  if (slot.partners.length > 1) return `שולחן ${slot.table} · שולחן משולש: ${slot.partners.map((x) => x.name).join(' + ')}`;
   return `שולחן ${slot.table} · ${slot.partner.name} — ${shortProfile(slot.partner)}`;
 }
 
@@ -306,7 +307,7 @@ export function masterRows(meetings, byId, settings, scores, explainFn) {
       const x = explainFn(m, scores);
       return {
         'סבב': m.round, 'שעה': roundTime(settings, m.round), 'שולחן': m.table,
-        "משתתף א'": byId[m.a]?.name, "משתתף ב'": byId[m.b]?.name,
+        "משתתף א'": byId[m.a]?.name, "משתתף ב'": [byId[m.b]?.name, m.c ? byId[m.c]?.name : null].filter(Boolean).join(' + '),
         'ציון': x.score, 'סיבת שיבוץ': x.label, 'נעול': m.locked ? 'כן' : '',
       };
     });
@@ -352,7 +353,7 @@ export function whatsappText(p, meetings, byId, settings, link = '') {
   const slots = personalSchedule(p, meetings, byId, settings);
   const lines = slots.map((s) =>
     s.partner
-      ? `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — ${s.partner.name} (${SIDES[s.partner.side]?.he}${profileLine(s.partner) ? ` · ${profileLine(s.partner).slice(0, 60)}${profileLine(s.partner).length > 60 ? '…' : ''}` : ''})`
+      ? s.partners.length > 1 ? `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — שולחן משולש: ${s.partners.map((x) => x.name).join(' + ')}` : `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — ${s.partner.name} (${SIDES[s.partner.side]?.he}${profileLine(s.partner) ? ` · ${profileLine(s.partner).slice(0, 60)}${profileLine(s.partner).length > 60 ? '…' : ''}` : ''})`
       : `▫️ סבב ${s.round} · ${s.time} · נטוורקינג חופשי ☕`,
   );
   return [

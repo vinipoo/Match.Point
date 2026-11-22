@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { EVENT, DEFAULT_SETTINGS, DEFAULT_WEIGHTS } from './lib/constants';
 import { computeScores, pairKey } from './engine/scoring';
-import { schedule, scheduleStats, analyzeGaps, activeIds, roundTime, roundEnd } from './engine/scheduler';
+import { schedule, scheduleStats, analyzeGaps, activeIds, roundTime, roundEnd, members } from './engine/scheduler';
 import { adminApi, boardHash } from './lib/cloud';
 import QrModal from './components/QrModal';
 import { M } from './components/ui';
@@ -33,7 +33,7 @@ export default function App() {
   const [settings, setSettingsRaw] = useState(() => {
     const s = { ...DEFAULT_SETTINGS, ...(saved?.settings || {}) };
     // engine v2: minimum of 3 consecutive meetings at the start replaces the old "2 + lower threshold" rule
-    return saved?.settings?.engineVersion === 2 ? s : { ...s, minMeetings: 3, engineVersion: 2 };
+    return saved?.settings?.engineVersion === 3 ? s : { ...s, minMeetings: Math.max(3, Number(s.minMeetings) || 3), engineVersion: 3 };
   });
   const [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS, ...(saved?.weights || {}) });
   const [constraints, setConstraints] = useState(saved?.constraints || { must: [], exclude: [] });
@@ -89,15 +89,25 @@ export default function App() {
   // meetings whose participant is no longer active (no-show / cancelled)
   const broken = useMemo(() => {
     const act = new Set(active);
-    return visibleMeetings.filter((m) => !act.has(m.a) || !act.has(m.b));
+    return visibleMeetings.filter((m) => members(m).some((id) => !act.has(id)));
   }, [visibleMeetings, active]);
 
   const run = useCallback((mode) => {
-    if (active.length < 2) { notify('אין מספיק משתתפים פעילים לשיבוץ', 'err'); return; }
+    if (active.length < 2) { notify('אין מספיק משתתפים שסומנו כ״הגיע״ לשיבוץ', 'err'); return; }
+    // every present participant must be seated in each of the first rounds: refuse an impossible schedule
+    const need = Math.floor(active.length / 2);
+    if (Number(settings.tables) < need) {
+      notify(`לא ניתן להבטיח ${settings.minMeetings} פגישות רצופות לכל ${active.length} הנוכחים: צריך לפחות ${need} שולחנות (מוגדרים ${settings.tables}). עדכנו בטאב 01.`, 'err');
+      return;
+    }
     const res = schedule({ participants, scores, settings, constraints, existing: meetings, mode });
     setMeetings(res.meetings);
     setLastRun({ at: new Date().toISOString(), ...res.log, total: res.meetings.length });
-    const added = res.log.auto + res.log.fallback + res.log.must;
+    const added = res.log.auto + res.log.fallback + res.log.must + (res.log.wildcard || 0);
+    if (res.log.unseated?.length) {
+      notify(`אזהרה: ${res.log.unseated.reduce((n, u) => n + u.ids.length, 0)} מקומות לא שובצו בסבבים הראשונים (החרגות). בדקו בטאב 04.`, 'err');
+      return;
+    }
     notify(
       mode === 'preserve'
         ? `שיבוץ מחדש: נשמרו ${res.log.kept} פגישות, בוטלו ${res.log.dropped}, נוספו ${added}`
@@ -148,7 +158,7 @@ export default function App() {
     try {
       const hash = boardHash(visibleMeetings);
       await adminApi(cloud.key).publishSchedule({
-        meetings: visibleMeetings.map(({ round, table, a, b, source }) => ({ round, table, a, b, wild: source === 'wildcard' })),
+        meetings: visibleMeetings.map(({ round, table, a, b, c, source }) => ({ round, table, a, b, ...(c ? { c } : {}), wild: source === 'wildcard' })),
         times: Array.from({ length: settings.rounds }, (_, i) => ({ round: i + 1, start: roundTime(settings, i + 1), end: roundEnd(settings, i + 1) })),
         hash,
       });
@@ -160,6 +170,14 @@ export default function App() {
       return false;
     }
   }, [cloud.key, visibleMeetings, settings, notify]);
+  const firstSyncRun = useRef(true);
+  useEffect(() => {
+    if (firstSyncRun.current) { firstSyncRun.current = false; return undefined; }
+    if (!cloud.key) return undefined;
+    const h = setTimeout(() => { adminApi(cloud.key).saveStaff(snapshot()).catch(() => {}); }, 2000);
+    return () => clearTimeout(h);
+  }, [participants, meetings, settings, constraints, weights, cloud.key, snapshot]);
+
   const [qrOpen, setQrOpen] = useState(false);
   const openQr = useCallback(() => setQrOpen(true), []);
   const boardDirty = !!cloud.publishedHash && cloud.publishedHash !== boardHash(visibleMeetings);
@@ -190,9 +208,9 @@ export default function App() {
         <div className="hdr-blocks">
           <M className="blk">{EVENT.date} | {EVENT.doors}</M>
           <span className="blk">{EVENT.address}</span>
-          <span className={`live-pill ${settings.liveMode ? 'on' : ''}`} title="מצב LIVE: רק מי שעשה צ'ק-אין משובץ">
+          <span className={`live-pill ${checkedIn ? 'on' : ''}`} title="רק מי שסומן ״הגיע״ משובץ">
             <span className="dot" />
-            {settings.liveMode ? 'LIVE' : 'PRE-EVENT'} · {checkedIn}/{participants.length}
+            נוכחים {checkedIn}/{participants.length}
           </span>
           <button className="icon-btn" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="החלף מצב תצוגה">
             {theme === 'dark' ? 'LIGHT' : 'DARK'}

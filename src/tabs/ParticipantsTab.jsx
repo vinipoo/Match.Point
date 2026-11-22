@@ -50,7 +50,7 @@ export default function ParticipantsTab(props) {
   const remove = (p) => {
     if (!window.confirm(`למחוק את ${p.name}? הפגישות וההעדפות שלו/ה יוסרו.`)) return;
     setParticipants((ps) => ps.filter((x) => x.id !== p.id).map((x) => ({ ...x, prefs: (x.prefs || []).filter((y) => y.id !== p.id) })));
-    setMeetings((ms) => ms.filter((m) => m.a !== p.id && m.b !== p.id));
+    setMeetings((ms) => ms.filter((m) => m.a !== p.id && m.b !== p.id).map((m) => (m.c === p.id ? { ...m, c: undefined } : m)));
     setConstraints((c) => ({ must: c.must.filter((x) => !x.includes(p.id)), exclude: c.exclude.filter((x) => !x.includes(p.id)) }));
   };
 
@@ -79,11 +79,10 @@ export default function ParticipantsTab(props) {
           </div>
         </Card>
         <Card num="02.B" title="מצב ערב האירוע" en="Live Event Mode">
-          <Toggle checked={settings.liveMode} onChange={(v) => setSettings({ liveMode: v })}
-            label="מצב LIVE – שבץ רק מי שעשה צ'ק-אין"
-            hint="כבוי: משובצים מאושרים + מי שהגיע (טרום אירוע). דלוק: רק Checked-in." />
-          <Toggle checked={settings.includePending} onChange={(v) => setSettings({ includePending: v })}
-            label="כלול משתתפים בהמתנה" hint="רלוונטי רק כשמצב LIVE כבוי." />
+          <div style={{ padding: '8px 10px', background: 'var(--soft)', borderInlineStart: '4px solid var(--lime)' }}>
+            <b>רק מי שסומן ״✓ הגיע״ נכלל בשיבוץ.</b>
+            <div className="small muted">סימון הגעה / Pitch נשמר מיד ומסתנכרן לענן (Pitch מופיע אצל המשתתפים בנייד). אחרי שינויים – הריצו שיבוץ ופרסמו.</div>
+          </div>
           <div className="row" style={{ marginTop: 10 }}>
             <button className="btn btn-sm" onClick={() => bulk('confirmed', 'checked_in', 'לסמן את כל המאושרים כהגיעו')}>כל המאושרים ← הגיעו</button>
             <button className="btn btn-sm btn-danger" onClick={() => bulk('confirmed', 'no_show', 'לסמן מאושרים שלא עשו צ׳ק-אין כ-No-show')}>מאושרים שלא הגיעו ← No-show</button>
@@ -115,7 +114,7 @@ export default function ParticipantsTab(props) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>ID</th><th>שם</th><th>צד</th><th>סטטוס הגעה · <M>Pitch</M>{cloud?.key ? ' (מסונכרן לנייד)' : ''}</th><th>פרופיל</th><th>כיוון / זמינות</th>
+                <th>ID</th><th>שם</th><th>צד</th><th>הגעה · <M>Pitch</M>{cloud?.key ? ' (מסונכרן)' : ''}</th><th>פרופיל</th><th>כיוון / זמינות</th>
                 <th>העדפות</th><th>פגישות</th><th>התאמות טובות</th><th />
               </tr>
             </thead>
@@ -131,19 +130,28 @@ export default function ParticipantsTab(props) {
                     </td>
                     <td><SideTag side={p.side} /></td>
                     <td>
-                      <div className="seg" role="group" aria-label="סטטוס">
-                        {Object.entries(STATUSES).map(([k, v]) => (
-                          <button key={k} className={`${k} ${p.status === k ? 'on' : ''}`} onClick={() => setStatusOf(p.id, k)} title={v.en}>{v.he}</button>
-                        ))}
-                      </div>{' '}
-                      <button
-                        className={`btn btn-xs ${p.didPitch ? 'btn-mag' : ''}`}
-                        aria-pressed={!!p.didPitch}
-                        title={p.didPitch ? 'הציג/ה Pitch – לחצו לביטול' : 'סמנו שהציג/ה Pitch'}
-                        onClick={() => togglePitch(p.id)}
-                      >
-                        🎤 Pitch{p.didPitch ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
-                      </button>
+                      <div className="checkin">
+                        <button
+                          className={`btn checkin-btn ${p.status === 'checked_in' ? 'btn-lime' : ''}`}
+                          aria-pressed={p.status === 'checked_in'}
+                          onClick={() => setStatusOf(p.id, p.status === 'checked_in' ? 'confirmed' : 'checked_in')}
+                          title={p.status === 'checked_in' ? 'לחצו לביטול ההגעה' : 'סמנו שהמשתתף/ת הגיע/ה'}
+                        >
+                          {p.status === 'checked_in' ? '✓ הגיע' : 'סמן הגעה'}
+                        </button>
+                        <button
+                          className={`btn btn-xs ${p.status === 'no_show' ? 'btn-mag' : ''}`}
+                          aria-pressed={p.status === 'no_show'}
+                          onClick={() => setStatusOf(p.id, p.status === 'no_show' ? 'confirmed' : 'no_show')}
+                        >
+                          לא הגיע
+                        </button>
+                        <label className={`pitch-check ${p.didPitch ? 'on' : ''}`} title="מסומן ע״י הצוות בלבד">
+                          <input type="checkbox" checked={!!p.didPitch} onChange={() => togglePitch(p.id)} />
+                          🎤 Pitch{p.didPitch ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
+                        </label>
+                      </div>
+                      {p.status !== 'checked_in' && p.status !== 'no_show' && <div className="small muted">{STATUSES[p.status]?.he} – טרם הגיע</div>}
                     </td>
                     <td>
                       {p.idea && <div className="trunc small" style={{ fontWeight: 600 }} title={p.idea}>{p.idea}</div>}

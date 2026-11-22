@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS = {
   startTime: '18:45',
   threshold: 30,
   minMeetings: 3,
-  engineVersion: 2,
+  engineVersion: 3,
   allowSameSide: false,
   enforceVentureRule: true,
   fairnessFallback: true,

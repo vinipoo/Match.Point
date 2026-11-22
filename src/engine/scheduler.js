@@ -12,15 +12,15 @@ export const fmtTime = (mins) =>
 export const roundTime = (s, r) => fmtTime(roundStartMinutes(s, r));
 export const roundEnd = (s, r) => fmtTime(roundStartMinutes(s, r) + Number(s.roundMin));
 
+// Only participants marked as arrived (checked-in) are scheduled.
+// eslint-disable-next-line no-unused-vars
 export function activeIds(participants, settings) {
-  return participants
-    .filter(
-      (p) =>
-        p.status === 'checked_in' ||
-        (!settings.liveMode && (p.status === 'confirmed' || (settings.includePending && p.status === 'pending'))),
-    )
-    .map((p) => p.id);
+  return participants.filter((p) => p.status === 'checked_in').map((p) => p.id);
 }
+
+// a meeting is a pair, or a trio (c) when the number of people present is odd
+export const members = (m) => [m.a, m.b, m.c].filter(Boolean);
+export const partnersOf = (m, id) => members(m).filter((x) => x !== id);
 
 // small seeded PRNG so a Wildcard draw is random but reproducible (same seed -> same pairs)
 function rng(seed) {
@@ -65,17 +65,21 @@ export function schedule({ participants, scores, settings, constraints, existing
   };
   const place = (m) => {
     meetings.push(m);
-    busy[m.round].add(m.a); busy[m.round].add(m.b);
     used[m.round].add(m.table);
-    seat[m.round][m.a] = m.table; seat[m.round][m.b] = m.table;
-    met.add(pairKey(m.a, m.b));
-    count[m.a] = (count[m.a] || 0) + 1;
-    count[m.b] = (count[m.b] || 0) + 1;
+    const ms = members(m);
+    for (const id of ms) {
+      busy[m.round].add(id);
+      seat[m.round][id] = m.table;
+      count[id] = (count[id] || 0) + 1;
+    }
+    for (let i = 0; i < ms.length; i++) for (let j = i + 1; j < ms.length; j++) met.add(pairKey(ms[i], ms[j]));
   };
 
   // 1 — keep existing meetings (locked always; in preserve-mode every valid one)
   const sortedExisting = [...existing].sort((x, y) => (y.locked ? 1 : 0) - (x.locked ? 1 : 0) || x.round - y.round);
-  for (const m of sortedExisting) {
+  for (const raw of sortedExisting) {
+    // a trio member who left (or is double-booked) is simply removed from the table
+    const m = raw.c && (!active.has(raw.c) || busy[raw.round]?.has(raw.c)) ? { ...raw, c: undefined } : raw;
     const bothActive = active.has(m.a) && active.has(m.b);
     const keep = m.round <= R && bothActive && (mode === 'preserve' || m.locked);
     if (!keep || busy[m.round].has(m.a) || busy[m.round].has(m.b) || met.has(pairKey(m.a, m.b))) {
@@ -120,12 +124,20 @@ export function schedule({ participants, scores, settings, constraints, existing
     const e = scores.get(k);
     return e && !e.blocked && !met.has(k) && e.score >= thr ? e : null;
   };
-  const profileFill = (x, y) => {
+  // returns [entry, penalty] – in the first K rounds only explicit exclusions are hard, so nobody is left out
+  const profileFill = (x, y, inBlock) => {
     const k = pairKey(x, y);
     const e = scores.get(k);
-    if (!e || met.has(k)) return null;
-    if (e.blocked && !(allowSameSideFill && e.blocked === 'sameSide')) return null; // exclusions / venture rule stay hard
-    return e;
+    if (!e || met.has(k) || e.blocked === 'exclude') return null;
+    if (!e.blocked) return [e, 0];
+    if (e.blocked === 'sameSide') return inBlock || allowSameSideFill ? [e, 0] : null;
+    return inBlock ? [e, 60] : null; // venture-vs-venture: last resort, only to guarantee the minimum
+  };
+  // priority picks: rank 1 > 2 > … > 5, mutual picks with high ranks on both sides first
+  const prefBonus = (e) => {
+    if (e.prefKind === 'mutual') return 10 + 20 * ((e.rfA + e.rfB) / 2);
+    if (e.prefKind === 'a' || e.prefKind === 'b') return 8 * (e.prefKind === 'a' ? e.rfA : e.rfB);
+    return 0;
   };
 
   const matchRound = (r) => {
@@ -152,12 +164,14 @@ export function schedule({ participants, scores, settings, constraints, existing
         const y = free[j];
         let e = quality(x, y);
         let tier = 'auto';
+        let penalty = 0;
         if (!e && (inBlock || below(x) || below(y))) {
-          e = profileFill(x, y);
+          const f = profileFill(x, y, inBlock || below(x) || below(y));
+          if (f) [e, penalty] = f;
           tier = 'fallback';
         }
         if (!e) continue;
-        const w = e.score + (tier === 'auto' ? 40 : 0) + (e.prefKind === 'mutual' ? 15 : 0)
+        const w = e.score + (tier === 'auto' ? 40 : 0) + prefBonus(e) - penalty
           + fair(x) + fair(y) + 10 / Math.max(1, opts[x]) + 10 / Math.max(1, opts[y]);
         const ed = { x, y, e, w, tier };
         edges.push(ed);
@@ -268,9 +282,39 @@ export function schedule({ participants, scores, settings, constraints, existing
     }
   };
 
+  log.trios = 0;
+  log.unseated = [];
+  const seatLeftovers = (r) => {
+    const left = ids.filter((id) => !busy[r].has(id));
+    if (left.length === 1) {
+      const u = left[0];
+      let best = null;
+      for (const m of meetings) {
+        if (m.round !== r || m.c) continue;
+        const ea = scores.get(pairKey(u, m.a));
+        const eb = scores.get(pairKey(u, m.b));
+        if (!ea || !eb || ea.blocked === 'exclude' || eb.blocked === 'exclude') continue;
+        if (met.has(pairKey(u, m.a)) || met.has(pairKey(u, m.b))) continue;
+        const s = ea.score + eb.score;
+        if (!best || s > best.s) best = { m, s };
+      }
+      if (best) {
+        best.m.c = u;
+        busy[r].add(u);
+        seat[r][u] = best.m.table;
+        count[u] = (count[u] || 0) + 1;
+        met.add(pairKey(u, best.m.a)); met.add(pairKey(u, best.m.b));
+        log.trios++;
+        return;
+      }
+    }
+    if (left.length) log.unseated.push({ round: r, ids: left });
+  };
+
   for (let r = startRound; r <= R; r++) {
     if (wild === r) wildcardRound(r); // surprise pairs first; anyone left over is completed by score below
     matchRound(r);
+    if (r <= K) seatLeftovers(r); // first K rounds: nobody sits out
   }
 
   meetings.sort((x, y) => x.round - y.round || x.table - y.table);
@@ -282,8 +326,7 @@ export function scheduleStats(meetings, active, settings, scores) {
   let sum = 0;
   let mutualMet = 0;
   for (const m of meetings) {
-    count[m.a] = (count[m.a] || 0) + 1;
-    count[m.b] = (count[m.b] || 0) + 1;
+    for (const id of members(m)) count[id] = (count[id] || 0) + 1;
     const e = scores.get(pairKey(m.a, m.b));
     sum += e?.score ?? m.score ?? 0;
     if (e?.prefKind === 'mutual') mutualMet++;
@@ -307,7 +350,7 @@ export function scheduleStats(meetings, active, settings, scores) {
     earlyGap: (() => {
       const K = Math.min(Number(settings.minMeetings) || 3, Number(settings.rounds));
       const early = {};
-      for (const m of meetings) if (m.round <= K) { early[m.a] = (early[m.a] || 0) + 1; early[m.b] = (early[m.b] || 0) + 1; }
+      for (const m of meetings) if (m.round <= K) for (const id of members(m)) early[id] = (early[id] || 0) + 1;
       return active.filter((id) => (early[id] || 0) < K);
     })(),
     sameSideFill: meetings.filter((m) => m.source === 'fallback' && scores.get(pairKey(m.a, m.b))?.blocked === 'sameSide').length,
@@ -354,7 +397,7 @@ export function analyzeGaps(participants, active, scores, settings) {
     options,
     rescueCount: weak.filter((w) => w.rescue > 0).length,
     tablesShort: Number(settings.tables) * 2 < act.length,
-    tablesNeeded: Math.ceil(act.length / 2),
+    tablesNeeded: Math.floor(act.length / 2), // odd count -> one three-person table
     maxPerRound,
   };
 }

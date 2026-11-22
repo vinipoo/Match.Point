@@ -62,7 +62,7 @@ export default function ExportTab(props) {
                       <td className="num">{stats.count[p.id] || 0}</td>
                       {slots.map((s) => (
                         <td key={s.round} className="small nowrap">
-                          {s.partner ? <><M style={{ fontWeight: 700 }}>T{pad(s.table)}</M> {s.partner.name.split(' ')[0]}</> : <span className="muted">—</span>}
+                          {s.partner ? <><M style={{ fontWeight: 700 }}>T{pad(s.table)}</M> {s.partners.map((x) => x.name.split(' ')[0]).join('+')}</> : <span className="muted">—</span>}
                         </td>
                       ))}
                       <td className="nowrap">
@@ -94,7 +94,7 @@ export default function ExportTab(props) {
         {Array.from({ length: settings.rounds }, (_, i) => {
           const r = i + 1;
           const ms = meetings.filter((m) => m.round === r).sort((a, b) => a.table - b.table);
-          const busy = new Set(ms.flatMap((m) => [m.a, m.b]));
+          const busy = new Set(ms.flatMap((m) => [m.a, m.b, m.c].filter(Boolean)));
           const free = participants.filter((p) => activeSet.has(p.id) && !busy.has(p.id));
           return (
             <div key={r} className="print-round" style={{ marginBottom: 18 }}>
@@ -111,7 +111,7 @@ export default function ExportTab(props) {
                       <tr key={m.id}>
                         <td className="num" style={{ fontSize: 16 }}>{pad(m.table)}</td>
                         <td><b>{byId[m.a]?.name}</b> <span className="small muted">{byId[m.a]?.phone}</span></td>
-                        <td><b>{byId[m.b]?.name}</b> <span className="small muted">{byId[m.b]?.phone}</span></td>
+                        <td><b>{byId[m.b]?.name}</b> <span className="small muted">{byId[m.b]?.phone}</span>{m.c && <><br /><b>+ {byId[m.c]?.name}</b> <span className="small muted">{byId[m.c]?.phone}</span></>}</td>
                         <td><Reason x={explain(m, scores)} locked={m.locked && m.source === 'auto'} /></td>
                       </tr>
                     ))}
