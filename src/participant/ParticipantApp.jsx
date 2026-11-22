@@ -14,7 +14,7 @@ const store = {
   del: (k) => { try { localStorage.removeItem(k); } catch { /* private mode */ } },
   json: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
 };
-const PitchBadge = ({ n }) => (n ? <span className="tag tag-mag pp-pitch">🎤 הציג/ה Pitch <M>#{n}</M></span> : null);
+const PitchBadge = ({ n }) => (n ? <span className="tag tag-mag pp-pitch">🎤 מציג/ה Pitch <M>#{n}</M></span> : null);
 const toMin = (s) => { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + m; };
 
 function Shell({ children, me, onLogout }) {

@@ -257,7 +257,7 @@ const TEMPLATE_HELP = [
   ['email / phone', 'פרטי קשר – לא מוצגים למשתתפים אחרים. 4 הספרות האחרונות של הטלפון משמשות לכניסה מהנייד'],
   ['side', 'tech / business / both (או: טכנולוגי / עסקי / היברידי)'],
   ['status', 'confirmed / checked-in / no-show / pending (או: מאושר / הגיע / לא הגיע / בהמתנה)'],
-  ['did_pitch', 'yes / no – האם הציג/ה Pitch. אפשר לעדכן גם בזמן האירוע בטאב 02'],
+  ['did_pitch', 'yes / no – האם מציג/ה Pitch. אפשר לעדכן גם בזמן האירוע בטאב 02'],
   ['brings / seeking / idea', 'מה מביא/ה לשולחן · איזה שותף/ה מחפש/ת · המיזם או הרעיון'],
   ['skills / seek_skills / industry', 'רשימות מופרדות ב-; (למשל: SaaS; פינטק)'],
   ['stage', 'none / idea / mvp / growth'],

@@ -152,7 +152,7 @@ export default function ParticipantsTab(props) {
                         >
                           לא הגיע
                         </button>
-                        <label className={`pitch-check ${p.didPitch ? 'on' : ''}`} title="מסומן ע״י הצוות בלבד">
+                        <label className={`pitch-check ${p.didPitch ? 'on' : ''}`} title="מסומן ע״י הצוות בלבד – מופיע אצל המשתתפים כ״מציג/ה Pitch״">
                           <input type="checkbox" checked={!!p.didPitch} onChange={() => togglePitch(p.id)} />
                           🎤 Pitch{pitchedIds.includes(p.id) ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
                         </label>
