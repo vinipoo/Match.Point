@@ -148,7 +148,7 @@ export default function ParticipantsTab(props) {
                         </button>
                         <label className={`pitch-check ${p.didPitch ? 'on' : ''}`} title="מסומן ע״י הצוות בלבד">
                           <input type="checkbox" checked={!!p.didPitch} onChange={() => togglePitch(p.id)} />
-                          🎤 Pitch{p.didPitch ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
+                          🎤 Pitch{pitchedIds.includes(p.id) ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
                         </label>
                       </div>
                       {p.status !== 'checked_in' && p.status !== 'no_show' && <div className="small muted">{STATUSES[p.status]?.he} – טרם הגיע</div>}

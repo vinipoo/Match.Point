@@ -356,7 +356,6 @@ function Portal({ token, onLogout, onInvalid }) {
                   <div className="pp-slot-time">
                     סבב <M>{pad(s.round)}</M> · <M>{s.start}–{s.end}</M>
                     {s.round === currentRound && <span className="tag tag-mag">עכשיו</span>}
-                    {s.wild && <span className="tag pp-wild">Wildcard ✨ היכרות מפתיעה</span>}
                   </div>
                   {s.partner ? (
                     <>

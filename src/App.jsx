@@ -131,11 +131,13 @@ export default function App() {
 
   // ── Pitch: local source of truth, mirrored to the cloud so phones show the badge ──
   const pitchedIds = useMemo(
-    () => participants.filter((p) => p.didPitch).sort((a, b) => (a.pitchAt || 0) - (b.pitchAt || 0)).map((p) => p.id),
+    () => participants.filter((p) => p.didPitch && p.status === 'checked_in').sort((a, b) => (a.pitchAt || 0) - (b.pitchAt || 0)).map((p) => p.id),
     [participants],
   );
   const togglePitch = useCallback((id) => setParticipants((ps) => ps.map((p) => (
-    p.id === id ? { ...p, didPitch: !p.didPitch, pitchAt: p.didPitch ? null : Date.now() } : p
+    p.id === id
+      ? { ...p, didPitch: !p.didPitch, pitchAt: p.didPitch ? null : Date.now(), status: p.didPitch ? p.status : 'checked_in' } // whoever pitched is here
+      : p
   ))), []);
   const [pitchSync, setPitchSync] = useState(null);
   const pitchKey = pitchedIds.join(',');

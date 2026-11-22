@@ -10,7 +10,7 @@ const PHASE_LABEL = { setup: 'טרום אירוע', open: 'דירוג פתוח �
 const fmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—');
 
 export default function LiveTab(props) {
-  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, pitchedIds, togglePitch, pitchSync, publishLive, openQr } = props;
+  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, publishLive, openQr } = props;
   const [keyInput, setKeyInput] = useState(cloud.key || '');
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState('');
@@ -89,7 +89,6 @@ export default function LiveTab(props) {
     subs.forEach((s) => s.list.forEach((id) => { if (s.id < id && subMap[id]?.includes(s.id)) n++; }));
     return n;
   }, [subs, subMap]);
-  const pitched = pitchedIds;
   const closesAt = status?.event?.closesAt ? Date.parse(status.event.closesAt) : null;
   const left = closesAt ? closesAt - (now + offset.current) : 0;
   const localHash = boardHash(meetings);
@@ -179,20 +178,6 @@ export default function LiveTab(props) {
             </div>
           </Card>
 
-          <Card num="2" title="מי הציג Pitch" en={`Pitched · ${pitched.length}`}>
-            <p className="small muted" style={{ margin: '0 0 8px' }}>לחצו על שם בזמן הפיצ׳ים (או על 🎤 בטאב 02) – הפרופילים יקבלו תג ״הציג/ה Pitch״ ויופיעו ראשונים אצל המשתתפים, לפי סדר ההצגה.
-              {pitchSync && <> · <span className={pitchSync.ok ? '' : 'tag tag-mag'}>{pitchSync.ok ? `סונכרן ${fmt(pitchSync.at)}` : `לא סונכרן: ${pitchSync.error}`}</span></>}</p>
-            <div className="chips">
-              {roster.filter((p) => rosterIds.has(p.id)).map((p) => {
-                const i = pitched.indexOf(p.id);
-                return (
-                  <button key={p.id} className={`tag ${i >= 0 ? 'tag-mag' : ''}`} style={{ cursor: 'pointer', padding: '3px 8px' }} onClick={() => togglePitch(p.id)}>
-                    {i >= 0 && <M>{i + 1}.</M>} {p.name}
-                  </button>
-                );
-              })}
-            </div>
-          </Card>
 
           <Card num="3" title="מצב האירוע – שליטה ידנית של הצוות" en={PHASE_LABEL[phase]}>
             <div className="stack" style={{ gap: 14 }}>
