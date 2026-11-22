@@ -386,3 +386,5 @@ input[type='range'] { width: 100%; accent-color: var(--mag); }
 .pitch-check { display: inline-flex; gap: 6px; align-items: center; border: var(--bw) solid var(--line); padding: 3px 8px; font-weight: 600; font-size: 12.5px; cursor: pointer; background: var(--card); white-space: nowrap; }
 .pitch-check input { width: 16px; height: 16px; accent-color: var(--mag); margin: 0; }
 .pitch-check.on { background: var(--mag); color: #fff; border-color: var(--char); }
+
+.person .nm-text { font-size: 19px; }

@@ -33,11 +33,11 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
             {i > 0 && <div className="vs">VS</div>}
             <div className="person">
               <div className="nm">
+                <span className="nm-text">{p?.name || '—'}</span>
                 {p && <SideTag side={p.side} />}
                 {p && pitchedIds.includes(p.id) && <span className="tag tag-mag">🎤 Pitch #{pitchedIds.indexOf(p.id) + 1}</span>}
                 {p && !activeSet.has(p.id) && <span className="tag tag-mag">לא פעיל</span>}
               </div>
-              <div className="pr trunc" title={p?.idea || p?.brings}>{p?.idea || p?.brings}</div>
             </div>
           </div>
         ))}
