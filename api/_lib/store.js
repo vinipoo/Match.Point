@@ -2,8 +2,17 @@
 // in-memory Map for local development.
 import { Redis } from '@upstash/redis';
 
-const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
-const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+// The Vercel integration may add a custom prefix (e.g. STORAGE_KV_REST_API_URL), so match by suffix.
+const envBySuffix = (...suffixes) => {
+  for (const suffix of suffixes) {
+    if (process.env[suffix]) return process.env[suffix];
+    const key = Object.keys(process.env).find((k) => k.endsWith(`_${suffix}`) && !k.includes('READ_ONLY'));
+    if (key && process.env[key]) return process.env[key];
+  }
+  return undefined;
+};
+const url = envBySuffix('KV_REST_API_URL', 'UPSTASH_REDIS_REST_URL');
+const token = envBySuffix('KV_REST_API_TOKEN', 'UPSTASH_REDIS_REST_TOKEN');
 const redis = url && token ? new Redis({ url, token }) : null;
 
 const mem = globalThis.__matchpointMem || (globalThis.__matchpointMem = new Map());
