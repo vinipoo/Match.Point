@@ -141,18 +141,33 @@ export default function App() {
   ))), []);
   const [pitchSync, setPitchSync] = useState(null);
   const pitchKey = pitchedIds.join(',');
-  useEffect(() => {
-    if (!cloud.key || cloud.pitchSynced === pitchKey) return undefined;
-    const h = setTimeout(() => {
-      adminApi(cloud.key).setPitched(pitchKey ? pitchKey.split(',') : [])
-        .then(() => {
-          setPitchSync({ ok: true, at: new Date().toISOString() });
-          setCloud((c) => ({ ...c, pitchSynced: pitchKey }));
-        })
-        .catch((e) => setPitchSync({ ok: false, error: e.message }));
-    }, 400);
+  // Keep the phones' pitch list equal to this console's marks. Compare with what is REALLY in the
+  // cloud (it can be cleared by a reset or changed from another device), not with what we last sent.
+  const pitchKeyRef = useRef(pitchKey);
+  pitchKeyRef.current = pitchKey;
+  const reconcilePitch = useCallback(async () => {
+    if (!cloud.key) return;
+    const api = adminApi(cloud.key);
+    try {
+      const s = await api.status();
+      const want = pitchKeyRef.current;
+      if ((s.pitched || []).join(',') !== want) await api.setPitched(want ? want.split(',') : []);
+      setPitchSync({ ok: true, at: new Date().toISOString() });
+      setCloud((c) => (c.pitchSynced === want ? c : { ...c, pitchSynced: want }));
+    } catch (e) {
+      setPitchSync({ ok: false, error: e.message });
+    }
+  }, [cloud.key]);
+  useEffect(() => { // on every change (debounced)
+    if (!cloud.key) return undefined;
+    const h = setTimeout(reconcilePitch, 400);
     return () => clearTimeout(h);
-  }, [pitchKey, cloud.key, cloud.pitchSynced]);
+  }, [pitchKey, cloud.key, reconcilePitch]);
+  useEffect(() => { // and every 20 s as a safety net
+    if (!cloud.key) return undefined;
+    const h = setInterval(reconcilePitch, 20000);
+    return () => clearInterval(h);
+  }, [cloud.key, reconcilePitch]);
 
   // ── 🚀 publish the current board to every participant's phone ──
   const publishLive = useCallback(async () => {
