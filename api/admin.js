@@ -69,11 +69,12 @@ export default async function handler(req, res) {
         const next = { ...ev, phase: b.phase };
         if (b.maxChoices) next.maxChoices = Math.max(1, Math.min(10, Number(b.maxChoices)));
         if (b.phase === 'open') {
-          const minutes = Math.max(1, Math.min(120, Number(b.minutes) || 15));
-          next.closesAt = new Date(Date.now() + minutes * 60_000).toISOString();
+          // optional display-only timer: 0 / missing = no countdown
+          const minutes = Math.min(120, Math.max(0, Number(b.minutes) || 0));
+          next.closesAt = minutes ? new Date(Date.now() + minutes * 60_000).toISOString() : null;
           next.openedAt = next.openedAt && ev.phase === 'open' ? next.openedAt : now;
         }
-        if (b.phase === 'closed') next.closesAt = now;
+        if (b.phase !== 'open') next.closesAt = null;
         await store.set(K.event, next);
         return send(res, 200, await status());
       }

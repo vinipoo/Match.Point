@@ -13,8 +13,8 @@ export const K = {
   prefs: (id) => `mp:prefs:${id}`,
 };
 
+// setup = pre-event · open = VOTING · closed = LOCKED · published = LIVE
 export const PHASES = ['setup', 'open', 'closed', 'published'];
-const GRACE_MS = 30_000;
 
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 export const newToken = () => [...crypto.randomBytes(12)].map((b) => ABC[b % ABC.length]).join('');
@@ -31,11 +31,9 @@ export function readBody(req) {
   return req.body || {};
 }
 
-// "open" ends by itself once the closing time (plus a short grace) has passed
-export function effectivePhase(ev, now = Date.now()) {
-  if (!ev?.phase) return 'setup';
-  if (ev.phase === 'open' && ev.closesAt && now > Date.parse(ev.closesAt) + GRACE_MS) return 'closed';
-  return ev.phase;
+// Phases change only when staff press a button – the optional timer is display-only and never locks
+export function effectivePhase(ev) {
+  return PHASES.includes(ev?.phase) ? ev.phase : 'setup';
 }
 
 function safeEqual(a, b) {

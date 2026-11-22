@@ -6,7 +6,7 @@ import LivePublishBar from '../components/LivePublishBar';
 
 import { toPublicProfile } from '../lib/profile';
 const toPublic = (p) => ({ ...toPublicProfile(p), last4: String(p.phone || '').replace(/\D/g, '').slice(-4) });
-const PHASE_LABEL = { setup: 'לפני ההפסקה', open: 'הגשה פתוחה', closed: 'הגשה סגורה', published: 'הלו״ז פורסם' };
+const PHASE_LABEL = { setup: 'טרום אירוע', open: 'דירוג פתוח · VOTING', closed: 'נעול לחישוב · LOCKED', published: 'לו״ז חי · LIVE' };
 const fmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—');
 
 export default function LiveTab(props) {
@@ -16,6 +16,7 @@ export default function LiveTab(props) {
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState('');
   const [minutes, setMinutes] = useState(15);
+  const [useTimer, setUseTimer] = useState(true);
   const [maxChoices, setMaxChoices] = useState(5);
   const [now, setNow] = useState(Date.now());
   const [pendingRun, setPendingRun] = useState(false);
@@ -193,31 +194,55 @@ export default function LiveTab(props) {
             </div>
           </Card>
 
-          <Card num="3" title="חלון הגשת העדפות (ההפסקה)" en={PHASE_LABEL[phase]}>
+          <Card num="3" title="מצב האירוע – שליטה ידנית של הצוות" en={PHASE_LABEL[phase]}>
             <div className="stack" style={{ gap: 14 }}>
+              <div className="phase-switch" role="group" aria-label="מצב האירוע">
+                <button className={`phase-btn voting ${phase === 'open' ? 'on' : ''}`} disabled={!rosterIds.size || !!busy}
+                  onClick={() => act('open', () => api.setPhase('open', { minutes: useTimer ? (phase === 'open' && closesAt ? Math.max(1, Math.ceil(Math.max(0, left) / 60000)) : minutes) : 0, maxChoices }), 'הדירוג נפתח – המשתתפים יכולים לבחור')}>
+                  <M className="phase-no">1</M><span className="phase-name">▶ דירוג פתוח</span><M className="phase-en">VOTING</M>
+                  <span className="phase-desc">המשתתפים בוחרים ושומרים</span>
+                </button>
+                <button className={`phase-btn locked ${phase === 'closed' ? 'on' : ''}`} disabled={!rosterIds.size || !!busy}
+                  onClick={() => (phase !== 'open' || window.confirm('לנעול את הדירוגים? המשתתפים לא יוכלו לשנות בחירות.')) && act('close', () => api.setPhase('closed'), 'הדירוגים ננעלו – אפשר לשבץ')}>
+                  <M className="phase-no">2</M><span className="phase-name">■ נעל דירוגים</span><M className="phase-en">LOCKED</M>
+                  <span className="phase-desc">הבחירות ננעלות · מסך המתנה</span>
+                </button>
+                <button className={`phase-btn live ${phase === 'published' ? 'on' : ''}`} disabled={!meetings.length || !!busy}
+                  onClick={async () => { setBusy('publish'); await publishLive(); setBusy(''); refresh(); }}>
+                  <M className="phase-no">3</M><span className="phase-name">🚀 פרסם לו״ז</span><M className="phase-en">LIVE</M>
+                  <span className="phase-desc">{meetings.length ? 'אצל המשתתפים: רק ״הלו״ז שלי״' : 'צריך קודם לוח שיבוץ'}</span>
+                </button>
+              </div>
               <div className="row">
-                <label className="field" style={{ width: 110 }}>
-                  <span>דקות</span>
-                  <input className="input mono" type="number" min={1} max={120} value={minutes} onChange={(e) => setMinutes(Number(e.target.value) || 15)} />
+                <label className="toggle" style={{ border: 0, padding: 0 }}>
+                  <input type="checkbox" checked={useTimer} onChange={(e) => setUseTimer(e.target.checked)} />
+                  <span className="sw" />
+                  <span><span className="t">טיימר תצוגה</span><div className="h">להמחשה בלבד – לא נועל לבד</div></span>
                 </label>
-                <label className="field" style={{ width: 130 }}>
+                {useTimer && (
+                  <label className="field" style={{ width: 90 }}>
+                    <span>דקות</span>
+                    <input className="input mono" type="number" min={1} max={120} value={minutes} onChange={(e) => setMinutes(Number(e.target.value) || 15)} />
+                  </label>
+                )}
+                <label className="field" style={{ width: 120 }}>
                   <span>מקס׳ בחירות</span>
                   <select className="select mono" value={maxChoices} onChange={(e) => setMaxChoices(Number(e.target.value))} disabled={phase === 'open'}>
                     {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
-                {phase !== 'open' ? (
-                  <button className="btn btn-lime btn-lg" style={{ alignSelf: 'flex-end' }} disabled={!rosterIds.size || !!busy}
-                    onClick={() => act('open', () => api.setPhase('open', { minutes, maxChoices }), 'ההגשה נפתחה')}>▶ פתח הגשה</button>
-                ) : (
+                {phase === 'open' && closesAt && (
                   <>
-                    <button className="btn" style={{ alignSelf: 'flex-end' }} disabled={!!busy}
-                      onClick={() => act('extend', () => api.setPhase('open', { minutes: Math.max(1, Math.ceil(left / 60000)) + 5 }), 'נוספו 5 דקות')}>+5 דק׳</button>
-                    <button className="btn btn-mag btn-lg" style={{ alignSelf: 'flex-end' }} disabled={!!busy}
-                      onClick={() => act('close', () => api.setPhase('closed'), 'ההגשה נסגרה')}>■ סגור הגשה</button>
+                    <M style={{ fontSize: 34, fontWeight: 700, alignSelf: 'flex-end' }}>{countdown(left)}</M>
+                    <button className="btn btn-sm" style={{ alignSelf: 'flex-end' }} disabled={!!busy}
+                      onClick={() => act('extend', () => api.setPhase('open', { minutes: Math.max(1, Math.ceil(Math.max(0, left) / 60000)) + 5 }), 'נוספו 5 דקות לטיימר')}>+5 דק׳</button>
+                    {left <= 0 && <span className="tag tag-mag" style={{ alignSelf: 'flex-end' }}>הזמן עבר – הדירוג פתוח עד ״נעל דירוגים״</span>}
                   </>
                 )}
-                {phase === 'open' && <M style={{ fontSize: 34, fontWeight: 700, alignSelf: 'flex-end' }}>{countdown(left)}</M>}
+                {phase !== 'setup' && (
+                  <button className="btn btn-sm btn-ghost" style={{ alignSelf: 'flex-end', marginInlineStart: 'auto' }} disabled={!!busy}
+                    onClick={() => window.confirm('להחזיר את האירוע למצב ״טרום אירוע״?') && act('setup', () => api.setPhase('setup'), 'חזרה לטרום אירוע')}>↺ טרום אירוע</button>
+                )}
               </div>
               <div className="kpis">
                 <Kpi value={subs.filter((s) => s.list.length).length} sub={`/${rosterIds.size}`} label="הגישו העדפות" />

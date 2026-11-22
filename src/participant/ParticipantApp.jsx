@@ -217,7 +217,10 @@ function Portal({ token, onLogout, onInvalid }) {
   const phase = data?.event.phase || 'setup';
   const closesAt = data?.event.closesAt ? Date.parse(data.event.closesAt) : null;
   const left = closesAt ? closesAt - (now + offset.current) : 0;
-  const isOpen = phase === 'open' && left > 0;
+  // only staff lock voting – the timer is display-only
+  const isOpen = phase === 'open';
+  const isLocked = phase === 'closed';
+  const isLive = phase === 'published';
   const max = data?.event.maxChoices || 5;
 
   const persist = useCallback((next) => {
@@ -290,21 +293,43 @@ function Portal({ token, onLogout, onInvalid }) {
       {phase === 'setup' && <div className="pp-banner">בחירת האנשים תיפתח בהפסקה שאחרי הפיצ׳ים. בינתיים אפשר לעיין בפרופילים.</div>}
       {isOpen && (
         <div className="pp-banner live">
-          <div><b>בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">לפי עדיפות: מס׳ 1 = הכי חשוב</div></div>
-          <M className="pp-count">{countdown(left)}</M>
+          <div><b>הדירוג פתוח – בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">לפי עדיפות: מס׳ 1 = הכי חשוב · כל שינוי נשמר מיד</div></div>
+          {closesAt && (left > 0 ? <M className="pp-count">{countdown(left)}</M> : <span className="small"><b>עוד רגע ננעל</b></span>)}
         </div>
       )}
-      {(phase === 'closed' || (phase === 'open' && !isOpen)) && <div className="pp-banner">ההגשה נסגרה ✓ השיבוץ בהכנה – הלו״ז יופיע כאן אוטומטית.</div>}
 
+      {isLocked ? (
+        <main className="pp-main">
+          <div className="pp-wait" role="status">
+            <div className="pp-wait-icon" aria-hidden="true">⏳</div>
+            <h2>הדירוג נסגר!</h2>
+            <p>אנחנו משבצים את הפגישות שלכם ממש עכשיו...</p>
+            <p className="small muted">הלו״ז האישי יופיע כאן אוטומטית – אין צורך לרענן.</p>
+          </div>
+          {list.length > 0 && (
+            <div className="pp-stack" style={{ marginTop: 14 }}>
+              <div className="small" style={{ fontWeight: 600 }}>הבחירות ששלחת:</div>
+              {list.map((id, i) => byId[id] && (
+                <div key={id} className="pp-rank">
+                  <M className="pp-rank-no">{i + 1}</M>
+                  <div className="pp-rank-body"><div className="pp-name">{byId[id].name} <SideTag side={byId[id].side} /></div></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      ) : (
+      <>
       <nav className="pp-nav">
-        {data.schedule && <button className={view === 'schedule' ? 'on' : ''} onClick={() => setView('schedule')}>הלו״ז שלי</button>}
-        <button className={view === 'browse' ? 'on' : ''} onClick={() => setView('browse')}>משתתפים <M>{roster.length - 1}</M></button>
-        <button className={view === 'mine' ? 'on' : ''} onClick={() => setView('mine')}>הבחירות שלי <M>{list.length}/{max}</M></button>
+        {data.schedule && <button className={view === 'schedule' || isLive ? 'on' : ''} onClick={() => setView('schedule')}>הלו״ז שלי</button>}
+        {!isLive && <button className={view === 'browse' ? 'on' : ''} onClick={() => setView('browse')}>משתתפים <M>{roster.length - 1}</M></button>}
+        {!isLive && <button className={view === 'mine' ? 'on' : ''} onClick={() => setView('mine')}>הבחירות שלי <M>{list.length}/{max}</M></button>}
         <button className="pp-refresh" onClick={refresh} aria-label="רענון" title="רענון">{refreshing ? '…' : '↻'}</button>
       </nav>
 
       <main className="pp-main">
-        {view === 'schedule' && data.schedule && (
+        {isLive && !data.schedule && <div className="pp-banner">הלו״ז שלך מתעדכן… אם הוא לא מופיע תוך דקה, פנו לצוות.</div>}
+        {(view === 'schedule' || isLive) && data.schedule && (
           <div className="pp-stack">
             {data.schedule.map((s) => (
               <div key={s.round} className={`pp-slot ${s.round === currentRound ? 'now' : ''} ${s.partner ? '' : 'free'} ${changed.includes(s.round) ? 'changed' : ''}`}>
@@ -334,7 +359,7 @@ function Portal({ token, onLogout, onInvalid }) {
           </div>
         )}
 
-        {view === 'mine' && (
+        {!isLive && view === 'mine' && (
           <div className="pp-stack">
             {list.length === 0 && <div className="pp-banner">עדיין לא בחרת אף אחד. עברו ל״משתתפים״ ולחצו ״רוצה לפגוש״.</div>}
             {list.map((id, i) => {
@@ -360,7 +385,7 @@ function Portal({ token, onLogout, onInvalid }) {
           </div>
         )}
 
-        {view === 'browse' && (
+        {!isLive && view === 'browse' && (
           <div className="pp-stack">
             <input className="input" placeholder="חיפוש חופשי: שם, מזהה, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
             <div className="pp-filters">
@@ -388,6 +413,8 @@ function Portal({ token, onLogout, onInvalid }) {
           </div>
         )}
       </main>
+      </>
+      )}
 
       {(isOpen || save.state === 'error') && (
         <footer className={`pp-save ${save.state}`} role="status">

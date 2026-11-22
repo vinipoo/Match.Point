@@ -58,3 +58,10 @@
 .pp-slot.changed { outline: 3px solid var(--mag); outline-offset: 2px; }
 .pp-wild { background: var(--char); color: var(--lime); border-color: var(--char); }
 .pp-nav .pp-refresh { flex: 0 0 48px; font-size: 18px; }
+.pp-wait { background: var(--char); color: #fff; border: var(--bw) solid #000; box-shadow: -6px 6px 0 var(--lime); padding: 28px 18px; text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.pp-wait h2 { font-size: 30px; color: var(--lime); }
+.pp-wait p { margin: 0; font-size: 17px; }
+.pp-wait .muted { color: #cfd3d6; }
+.pp-wait-icon { font-size: 40px; animation: pp-spin 2.4s linear infinite; }
+@keyframes pp-spin { 50% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pp-wait-icon { animation: none; } }
