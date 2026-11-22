@@ -23,11 +23,17 @@ export default function ParticipantsTab(props) {
 
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return participants.filter((p) =>
+    const rows = participants.filter((p) =>
       (side === 'all' || p.side === side) &&
-      (status === 'all' || p.status === status) &&
+      (status === 'all' || (status === 'pitch' ? p.didPitch : p.status === status)) &&
       (!t || [p.name, p.id, p.brings, p.idea, p.email, p.phone, ...(p.skills || [])].join(' ').toLowerCase().includes(t)));
-  }, [participants, q, side, status]);
+    // pitch filter: in pitch order (#1, #2, …), people marked "no-show" last
+    if (status === 'pitch') {
+      const order = (p) => (pitchedIds.includes(p.id) ? pitchedIds.indexOf(p.id) : 1e6);
+      rows.sort((a, b) => order(a) - order(b));
+    }
+    return rows;
+  }, [participants, q, side, status, pitchedIds]);
 
   const nameOf = (id) => participants.find((p) => p.id === id)?.name || id;
   const setStatusOf = (id, st) => setParticipants((ps) => ps.map((p) => (p.id === id ? { ...p, status: st } : p)));
@@ -113,6 +119,7 @@ export default function ParticipantsTab(props) {
           </select>
           <select className="select" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">כל הסטטוסים</option>
+            <option value="pitch">🎤 מציגי Pitch ({participants.filter((p) => p.didPitch).length})</option>
             {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.he} · {v.en}</option>)}
           </select>
         </div>
