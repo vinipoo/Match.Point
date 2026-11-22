@@ -8,7 +8,7 @@ const pad = (n) => String(n).padStart(2, '0');
 let seq = 0;
 const mid = () => `mm${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onTable, past }) {
+function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onTable, past, pitchedIds = [] }) {
   const people = members(m).map((id) => byId[id]);
   const x = explain(m, scores);
   const broken = members(m).some((id) => !activeSet.has(id));
@@ -33,7 +33,8 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
             {i > 0 && <div className="vs">VS</div>}
             <div className="person">
               <div className="nm">
-                {p?.name || '—'} {p && <SideTag side={p.side} />}
+                {p && <SideTag side={p.side} />}
+                {p && pitchedIds.includes(p.id) && <span className="tag tag-mag">🎤 Pitch #{pitchedIds.indexOf(p.id) + 1}</span>}
                 {p && !activeSet.has(p.id) && <span className="tag tag-mag">לא פעיל</span>}
               </div>
               <div className="pr trunc" title={p?.idea || p?.brings}>{p?.idea || p?.brings}</div>
@@ -50,7 +51,7 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
 }
 
 export default function BoardTab(props) {
-  const { participants, byId, settings, setSettings, meetings, setMeetings, scores, active, run, addConstraint, notify, broken, setTab, publishLive, openQr, boardDirty, cloud } = props;
+  const { participants, byId, settings, setSettings, meetings, setMeetings, scores, active, run, addConstraint, notify, broken, setTab, publishLive, openQr, boardDirty, cloud, pitchedIds } = props;
   const [round, setRound] = useState(Math.min(settings.currentRound || 1, settings.rounds));
   const [view, setView] = useState('tables');
   const [pa, setPa] = useState('');
@@ -153,7 +154,7 @@ export default function BoardTab(props) {
               <div className="grid-auto">
                 {inRound.map((m) => (
                   <TableCard key={m.id} m={m} byId={byId} scores={scores} settings={settings} activeSet={activeSet}
-                    onLock={onLock} onCancel={onCancel} onTable={onTable} past={r < settings.currentRound} />
+                    onLock={onLock} onCancel={onCancel} onTable={onTable} past={r < settings.currentRound} pitchedIds={pitchedIds} />
                 ))}
               </div>
             )}

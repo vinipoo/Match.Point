@@ -14,6 +14,7 @@ const store = {
   del: (k) => { try { localStorage.removeItem(k); } catch { /* private mode */ } },
   json: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
 };
+const PitchBadge = ({ n }) => (n ? <span className="tag tag-mag pp-pitch">🎤 הציג/ה Pitch <M>#{n}</M></span> : null);
 const toMin = (s) => { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + m; };
 
 function Shell({ children, me, onLogout }) {
@@ -130,7 +131,7 @@ function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
         <M className="pp-id">{p.id}</M>
         <div className="pp-name">{p.name}</div>
         <SideTag side={p.side} />
-        {p.pitched && <span className="tag tag-mag">🎤 הציג/ה Pitch</span>}
+        <PitchBadge n={p.pitchNo} />
       </div>
       {(p.brings || p.stage) && (
         <div className="pp-summary">
@@ -261,7 +262,8 @@ function Portal({ token, onLogout, onInvalid }) {
   };
 
   const pitchedSet = useMemo(() => new Set(data?.pitched || []), [data]);
-  const roster = useMemo(() => (data?.roster || []).map((p) => ({ ...p, pitched: pitchedSet.has(p.id) })), [data, pitchedSet]);
+  const pitchNo = useMemo(() => new Map((data?.pitched || []).map((id, i) => [id, i + 1])), [data]);
+  const roster = useMemo(() => (data?.roster || []).map((p) => ({ ...p, pitched: pitchedSet.has(p.id), pitchNo: pitchNo.get(p.id) || 0 })), [data, pitchedSet, pitchNo]);
   const byId = useMemo(() => Object.fromEntries(roster.map((p) => [p.id, p])), [roster]);
   // fixed domain list; every free-text "other" value is already grouped under a single "אחר"
   const industries = useMemo(() => {
@@ -360,8 +362,8 @@ function Portal({ token, onLogout, onInvalid }) {
                   {s.partner ? (
                     <>
                       {s.partner2 && <span className="tag tag-dark" style={{ alignSelf: 'flex-start' }}>שולחן משולש</span>}
-                      <div className="pp-name">{s.partner.name} <SideTag side={s.partner.side} /></div>
-                      {s.partner2 && <div className="pp-name">+ {s.partner2.name} <SideTag side={s.partner2.side} /></div>}
+                      <div className="pp-name">{s.partner.name} <SideTag side={s.partner.side} /> <PitchBadge n={pitchNo.get(s.partner.id)} /></div>
+                      {s.partner2 && <div className="pp-name">+ {s.partner2.name} <SideTag side={s.partner2.side} /> <PitchBadge n={pitchNo.get(s.partner2.id)} /></div>}
                       {s.partner.industry?.length > 0 && <div className="chips">{s.partner.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>}
                       {(s.partner.idea || s.partner.brings) && <div className="small pp-clamp">{s.partner.idea || s.partner.brings}</div>}
                     </>
@@ -391,7 +393,7 @@ function Portal({ token, onLogout, onInvalid }) {
                   <M className="pp-rank-no" aria-label={`עדיפות ${i + 1}`}>{i + 1}</M>
                   <div className="pp-rank-body">
                     <div className="small" style={{ fontWeight: 700 }}>עדיפות {i + 1}{i === 0 ? ' · הכי חשוב' : ''}</div>
-                    <div className="pp-name">{p.name} <SideTag side={p.side} /></div>
+                    <div className="pp-name">{p.name} <SideTag side={p.side} /> <PitchBadge n={p.pitchNo} /></div>
                     {(p.idea || p.brings) && <div className="small muted pp-clamp">{p.idea || p.brings}</div>}
                   </div>
                   {isOpen && (

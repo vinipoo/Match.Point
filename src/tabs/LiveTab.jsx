@@ -10,7 +10,7 @@ const PHASE_LABEL = { setup: 'טרום אירוע', open: 'דירוג פתוח �
 const fmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—');
 
 export default function LiveTab(props) {
-  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, publishLive, openQr } = props;
+  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, publishLive, openQr, pitchedIds } = props;
   const [keyInput, setKeyInput] = useState(cloud.key || '');
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState('');
@@ -140,7 +140,7 @@ export default function LiveTab(props) {
           <Card num="1" title="פרסום רשימת המשתתפים וקישורים אישיים" en="Roster & links">
             <div className="stack" style={{ gap: 12 }}>
               <div className="row">
-                <button className="btn btn-lime" disabled={!roster.length || !!busy} onClick={() => act('roster', () => api.publishRoster(roster.map(toPublic)), `פורסמו ${roster.length} פרופילים`)}>
+                <button className="btn btn-lime" disabled={!roster.length || !!busy} onClick={() => act('roster', async () => { const r = await api.publishRoster(roster.map(toPublic)); await api.setPitched(pitchedIds); setCloud((c) => ({ ...c, pitchSynced: pitchedIds.join(',') })); return r; }, `פורסמו ${roster.length} פרופילים`)}>
                   {rosterIds.size ? 'עדכן רשימה' : 'פרסם רשימה'} (<M>{roster.length}</M>)
                 </button>
                 <span className="small muted">בענן: <M>{rosterIds.size}</M> פרופילים · עודכן {fmt(status.event.rosterAt)} · ללא טלפון ומייל</span>

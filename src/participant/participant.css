@@ -85,3 +85,6 @@ html:has(.pp), body:has(.pp) { overflow-x: hidden; max-width: 100%; }
 .pp-save { flex-wrap: wrap; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 .pp { padding-bottom: 90px; }
 .pp-rank-acts { flex-shrink: 0; }
+
+.pp-pitch { font-weight: 700; }
+.pp-pitch .mono { color: #fff; }

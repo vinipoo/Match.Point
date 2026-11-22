@@ -141,17 +141,18 @@ export default function App() {
   ))), []);
   const [pitchSync, setPitchSync] = useState(null);
   const pitchKey = pitchedIds.join(',');
-  const firstPitchRun = useRef(true);
   useEffect(() => {
-    if (firstPitchRun.current) { firstPitchRun.current = false; return undefined; } // don't overwrite the cloud on page load
-    if (!cloud.key) return undefined;
+    if (!cloud.key || cloud.pitchSynced === pitchKey) return undefined;
     const h = setTimeout(() => {
       adminApi(cloud.key).setPitched(pitchKey ? pitchKey.split(',') : [])
-        .then(() => setPitchSync({ ok: true, at: new Date().toISOString() }))
+        .then(() => {
+          setPitchSync({ ok: true, at: new Date().toISOString() });
+          setCloud((c) => ({ ...c, pitchSynced: pitchKey }));
+        })
         .catch((e) => setPitchSync({ ok: false, error: e.message }));
     }, 400);
     return () => clearTimeout(h);
-  }, [pitchKey, cloud.key]);
+  }, [pitchKey, cloud.key, cloud.pitchSynced]);
 
   // ── 🚀 publish the current board to every participant's phone ──
   const publishLive = useCallback(async () => {

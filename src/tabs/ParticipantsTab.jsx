@@ -9,7 +9,7 @@ const blank = (id) => ({
 });
 
 export default function ParticipantsTab(props) {
-  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify, togglePitch, pitchedIds, cloud } = props;
+  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify, togglePitch, pitchedIds, cloud, pitchSync } = props;
   const [q, setQ] = useState('');
   const [side, setSide] = useState('all');
   const [status, setStatus] = useState('all');
@@ -82,6 +82,12 @@ export default function ParticipantsTab(props) {
           <div style={{ padding: '8px 10px', background: 'var(--soft)', borderInlineStart: '4px solid var(--lime)' }}>
             <b>רק מי שסומן ״✓ הגיע״ נכלל בשיבוץ.</b>
             <div className="small muted">סימון הגעה / Pitch נשמר מיד ומסתנכרן לענן (Pitch מופיע אצל המשתתפים בנייד). אחרי שינויים – הריצו שיבוץ ופרסמו.</div>
+            <div className="small" style={{ marginTop: 4 }}>
+              {!cloud?.key ? <span className="tag">Pitch לא מסונכרן לנייד – התחברו בטאב 03</span>
+                : pitchSync?.ok === false ? <span className="tag tag-mag">Pitch לא סונכרן: {pitchSync.error}</span>
+                : cloud.pitchSynced === pitchedIds.join(',') ? <span className="tag tag-lime">🎤 {pitchedIds.length} מציגי Pitch מוצגים בנייד ✓</span>
+                : <span className="tag">מסנכרן Pitch…</span>}
+            </div>
           </div>
           <div className="row" style={{ marginTop: 10 }}>
             <button className="btn btn-sm" onClick={() => bulk('confirmed', 'checked_in', 'לסמן את כל המאושרים כהגיעו')}>כל המאושרים ← הגיעו</button>
