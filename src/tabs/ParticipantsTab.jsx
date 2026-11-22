@@ -25,9 +25,9 @@ export default function ParticipantsTab(props) {
     const t = q.trim().toLowerCase();
     const rows = participants.filter((p) =>
       (side === 'all' || p.side === side) &&
-      (status === 'all' || (status === 'pitch' ? p.didPitch : p.status === status)) &&
+      (status === 'all' || (status === 'pitch' ? p.didPitch && p.status === 'checked_in' : p.status === status)) &&
       (!t || [p.name, p.id, p.brings, p.idea, p.email, p.phone, ...(p.skills || [])].join(' ').toLowerCase().includes(t)));
-    // pitch filter: in pitch order (#1, #2, …), people marked "no-show" last
+    // pitch filter: only presenters who arrived, in pitch order (#1, #2, …)
     if (status === 'pitch') {
       const order = (p) => (pitchedIds.includes(p.id) ? pitchedIds.indexOf(p.id) : 1e6);
       rows.sort((a, b) => order(a) - order(b));
@@ -119,7 +119,7 @@ export default function ParticipantsTab(props) {
           </select>
           <select className="select" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="all">כל הסטטוסים</option>
-            <option value="pitch">🎤 מציגי Pitch ({participants.filter((p) => p.didPitch).length})</option>
+            <option value="pitch">🎤 מציגי Pitch שהגיעו ({participants.filter((p) => p.didPitch && p.status === 'checked_in').length})</option>
             {Object.entries(STATUSES).map(([k, v]) => <option key={k} value={k}>{v.he} · {v.en}</option>)}
           </select>
         </div>

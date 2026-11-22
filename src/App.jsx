@@ -131,7 +131,10 @@ export default function App() {
 
   // ── Pitch: local source of truth, mirrored to the cloud so phones show the badge ──
   const pitchedIds = useMemo(
-    () => participants.filter((p) => p.didPitch && p.status !== 'no_show').sort((a, b) => (a.pitchAt || 0) - (b.pitchAt || 0)).map((p) => p.id),
+    () => participants.filter((p) => p.didPitch && p.status !== 'no_show')
+      // arrived presenters are numbered first, so the order has no gaps among the people actually here
+      .sort((a, b) => (b.status === 'checked_in') - (a.status === 'checked_in') || (a.pitchAt || 0) - (b.pitchAt || 0))
+      .map((p) => p.id),
     [participants],
   );
   const togglePitch = useCallback((id) => setParticipants((ps) => ps.map((p) => (
