@@ -22,6 +22,23 @@ export function activeIds(participants, settings) {
     .map((p) => p.id);
 }
 
+// small seeded PRNG so a Wildcard draw is random but reproducible (same seed -> same pairs)
+function rng(seed) {
+  let a = (Number(seed) || 1) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const shuffle = (arr, rand) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+};
+
 let seq = 0;
 const newId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
 
@@ -184,13 +201,52 @@ export function schedule({ participants, scores, settings, constraints, existing
     }
   };
 
-  for (let r = startRound; r <= R; r++) matchRound(r, thr, null, 'auto');
+  // Wildcard round: controlled-random complementary pairs (Tech ↔ Business), ignoring explicit picks
+  const wild = settings.wildcardEnabled ? Number(settings.wildcardRound) : null;
+  const isWild = (r) => wild !== null && r === wild;
+  log.wildcard = 0;
+
+  for (let r = startRound; r <= R; r++) if (!isWild(r)) matchRound(r, thr, null, 'auto');
 
   // 4 — fairness fallback: lower the bar only for under-served people
   if (settings.fairnessFallback) {
     const floor = thr - Number(settings.fallbackDrop || 0);
     for (let r = startRound; r <= R; r++) {
+      if (isWild(r)) continue;
       matchRound(r, floor, (x, y) => (count[x] || 0) < minM || (count[y] || 0) < minM, 'fallback');
+    }
+  }
+
+  if (wild !== null && wild >= startRound && wild <= R) {
+    const r = wild;
+    const rand = rng(settings.wildcardSeed);
+    const free = ids.filter((id) => !busy[r].has(id));
+    const sideOf = Object.fromEntries(participants.map((p) => [p.id, p.side]));
+    const ok = (x, y) => {
+      const e = scores.get(pairKey(x, y));
+      // hard rules still apply (exclusions / venture rule), explicit preferences do not
+      return e && (!e.blocked || e.blocked === 'sameSide') && !met.has(pairKey(x, y));
+    };
+    const tech = shuffle(free.filter((id) => sideOf[id] === 'tech'), rand);
+    const biz = shuffle(free.filter((id) => sideOf[id] === 'business'), rand);
+    const both = shuffle(free.filter((id) => sideOf[id] === 'both'), rand);
+    // smaller group first so as many people as possible get a surprise partner
+    const [few, many] = tech.length <= biz.length ? [tech, biz] : [biz, tech];
+    const pool = [...many, ...both];
+    const taken = new Set();
+    const pairs = [];
+    for (const x of [...few, ...both]) {
+      if (taken.has(x)) continue;
+      const y = pool.find((cand) => cand !== x && !taken.has(cand) && sideOf[cand] !== sideOf[x] && ok(x, cand));
+      if (!y) continue;
+      taken.add(x); taken.add(y);
+      pairs.push([x, y]);
+    }
+    for (const [x, y] of pairs) {
+      const t = freeTable(r, [seat[r - 1]?.[x], seat[r - 1]?.[y]]);
+      if (!t) break;
+      place({ id: newId(), round: r, table: t, a: x, b: y, score: scores.get(pairKey(x, y))?.score ?? 0, locked: false, source: 'wildcard' });
+      log.wildcard++;
     }
   }
 

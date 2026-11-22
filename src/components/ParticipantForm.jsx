@@ -64,6 +64,7 @@ export default function ParticipantForm({ initial, participants, onSave, onClose
           {Sel({ label: 'שלב המיזם', k: 'stage', opts: STAGES })}
           <div className="field" style={{ justifyContent: 'flex-end' }}>
             <Toggle checked={p.openToJoin} onChange={(v) => set({ openToJoin: v })} label="פתוח/ה להצטרף למיזם של אחר/ת" />
+            <Toggle checked={p.didPitch} onChange={(v) => set({ didPitch: v, pitchAt: v ? p.pitchAt || Date.now() : null })} label="🎤 הציג/ה Pitch" />
           </div>
           {Txt({ label: 'מיזם / רעיון קיים', k: 'idea', area: true })}
           {Txt({ label: 'מה מביא/ה לשולחן', k: 'brings', area: true })}

@@ -17,6 +17,12 @@ export default async function handler(req, res) {
     const problem = storageProblem();
     if (problem) return send(res, 503, { error: 'המערכת עדיין לא מוכנה. נסו שוב בעוד רגע.' });
 
+    // public directory for the login screen: names + IDs only
+    if (req.method === 'GET' && req.query?.action === 'directory') {
+      const roster = (await store.get(K.roster)) || [];
+      return send(res, 200, { participants: roster.map((p) => ({ id: p.id, name: p.name })) });
+    }
+
     if (req.method === 'GET') {
       const who = await identify(req.query?.t);
       if (!who) return send(res, 404, { error: 'הקישור לא תקין או שפג תוקפו. פנו לצוות האירוע.' });
@@ -31,7 +37,7 @@ export default async function handler(req, res) {
         mySchedule = schedule.times.map((t) => {
           const m = schedule.meetings.find((x) => x.round === t.round && (x.a === me.id || x.b === me.id));
           const partner = m ? byId[m.a === me.id ? m.b : m.a] || null : null;
-          return { ...t, table: m?.table ?? null, partner };
+          return { ...t, table: m?.table ?? null, partner, wild: !!m?.wild };
         });
       }
       return send(res, 200, {
@@ -45,6 +51,25 @@ export default async function handler(req, res) {
         schedule: mySchedule,
         publishedAt: phase === 'published' ? schedule?.publishedAt || null : null,
       });
+    }
+
+    if (req.method === 'POST' && readBody(req).action === 'login') {
+      const b = readBody(req);
+      const id = String(b.id || '');
+      const last4 = String(b.last4 || '').replace(/\D/g, '');
+      if (!id || last4.length !== 4) return send(res, 400, { error: 'בחרו שם והזינו 4 ספרות' });
+      const tries = (await store.get(K.login(id))) || { n: 0, until: 0 };
+      if (tries.n >= 8 && Date.now() < tries.until) return send(res, 429, { error: 'יותר מדי ניסיונות. נסו שוב בעוד כמה דקות או פנו לצוות' });
+      const [auth, tokens] = await Promise.all([store.get(K.auth), store.get(K.tokens)]);
+      if (!auth?.[id] || auth[id] !== last4) {
+        const n = Date.now() < tries.until ? tries.n + 1 : 1;
+        await store.set(K.login(id), { n, until: Date.now() + 10 * 60_000 });
+        return send(res, 401, { error: 'הפרטים לא תואמים. בדקו את 4 הספרות האחרונות של הטלפון' });
+      }
+      const token = Object.entries(tokens || {}).find(([, pid]) => pid === id)?.[0];
+      if (!token) return send(res, 404, { error: 'המשתתף לא נמצא – פנו לצוות' });
+      await store.del([K.login(id)]);
+      return send(res, 200, { token });
     }
 
     if (req.method === 'POST') {

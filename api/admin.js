@@ -51,8 +51,15 @@ export default async function handler(req, res) {
             idToToken[p.id] = t;
           }
         }
+        // last 4 phone digits only (never the full number) – used for the name + 4 digits login
+        const auth = Object.fromEntries(b.participants
+          .map((p) => [String(p.id), String(p.last4 || '').replace(/\D/g, '').slice(-4)])
+          .filter(([, d]) => d.length === 4));
         const ev = (await store.get(K.event)) || { phase: 'setup', maxChoices: 5 };
-        await Promise.all([store.set(K.roster, roster), store.set(K.tokens, tokens), store.set(K.event, { ...ev, rosterAt: now })]);
+        await Promise.all([
+          store.set(K.roster, roster), store.set(K.tokens, tokens), store.set(K.auth, auth),
+          store.set(K.event, { ...ev, rosterAt: now }),
+        ]);
         return send(res, 200, await status());
       }
 
@@ -80,7 +87,7 @@ export default async function handler(req, res) {
       case 'schedule': {
         if (!Array.isArray(b.meetings) || !Array.isArray(b.times)) return send(res, 400, { error: 'לוח שיבוץ חסר' });
         const schedule = {
-          meetings: b.meetings.map((m) => ({ round: Number(m.round), table: Number(m.table), a: String(m.a), b: String(m.b) })),
+          meetings: b.meetings.map((m) => ({ round: Number(m.round), table: Number(m.table), a: String(m.a), b: String(m.b), wild: !!m.wild })),
           times: b.times.map((t) => ({ round: Number(t.round), start: String(t.start), end: String(t.end) })),
           hash: String(b.hash || ''),
           publishedAt: now,

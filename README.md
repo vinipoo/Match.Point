@@ -11,15 +11,22 @@ npm run dev      # http://localhost:5190 – /api runs locally with in-memory st
 npm run build
 ```
 
+## Links
+- **Participants:** the main link `https://match-point-pied.vercel.app` (or the projected QR) → log in with name + last 4 phone digits.
+  Personal links `/?p=<code>` skip the login; `/?p=P01` opens the login with the name pre-selected.
+- **Staff console:** `https://match-point-pied.vercel.app/?mode=admin`
+
 ## Event-night flow
 1. **Staff console → tab 03**: enter the staff key, *Publish roster* (public profiles only – no phone/email).
    Each participant gets a personal link `/?p=<token>`; send it from the links table (WhatsApp).
-2. **Pitches**: tap who pitched – they get a badge and appear first for participants.
+2. **Pitches**: tap 🎤 Pitch next to the person in tab 02 (or in tab 03) – the badge appears on phones within seconds,
+   pitchers are listed first. Non-pitchers keep full matching weight (profile fit + fairness).
 3. **Break**: *Open preferences* (15 min, up to 5 ranked choices). Participants browse profiles and pick on their phone;
    every change is saved immediately. Live progress, most-requested and mutual counts on the staff screen.
 4. **Close → Pull preferences and run** – choices become ranked preferences (#1 = highest) in the matching engine.
-5. **Publish schedule** – each participant's page switches to "My schedule" (round, time, table, partner).
-   Re-publish after any change; phones refresh by themselves.
+   Optional **Wildcard round** (tab 04, round 2 or 3): seeded-random Tech ↔ Business pairs who haven't met, ignoring picks.
+5. **🚀 Publish live** (tabs 03 / 05 / 06, plus a projectable QR) – phones switch to "My schedule" (round, time, table, partner).
+   Re-publish after any change; phones poll every 10 s and show a magenta alert for changed upcoming rounds.
 
 ## Vercel setup (one time)
 - Project → **Storage** → connect **Upstash Redis** (injects `KV_REST_API_URL` / `KV_REST_API_TOKEN`).

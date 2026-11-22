@@ -69,6 +69,22 @@ export default function EngineTab(props) {
             label="אפשר התאמות משלימות בתוך אותו צד" hint="Tech-Tech / Biz-Biz לפי כישורים משלימים – מומלץ כשיש פער מספרי." />
           <Toggle checked={settings.fairnessFallback} onChange={(v) => setSettings({ fairnessFallback: v })}
             label="רשת ביטחון להגינות" hint={`למי שיש פחות מ-${settings.minMeetings} פגישות: הורדת הסף ב-${settings.fallbackDrop} נק׳.`} />
+          <div style={{ marginTop: 6, padding: '8px 10px', border: '1.5px dashed var(--mag)' }}>
+            <Toggle checked={settings.wildcardEnabled} onChange={(v) => setSettings({ wildcardEnabled: v })}
+              label={<>סבב הפתעה <M>Wildcard</M></>}
+              hint="בסבב שנבחר: זוגות Tech ↔ Business אקראיים (מבין מי שעוד לא נפגשו), בלי קשר לבחירות – כדי לשבור שגרה באמצע הערב." />
+            {settings.wildcardEnabled && (
+              <div className="row" style={{ marginTop: 4 }}>
+                <span className="small" style={{ fontWeight: 600 }}>סבב:</span>
+                <div className="seg">
+                  {[2, 3].filter((n) => n <= settings.rounds).map((n) => (
+                    <button key={n} className={settings.wildcardRound === n ? 'on confirmed' : ''} onClick={() => setSettings({ wildcardRound: n })}><M>{String(n).padStart(2, '0')}</M></button>
+                  ))}
+                </div>
+                <button className="btn btn-sm" onClick={() => setSettings({ wildcardSeed: Math.floor(Math.random() * 1e9) + 1 })} title="הגרלה חדשה של זוגות ה-Wildcard (בהרצה הבאה)">🎲 הגרל מחדש</button>
+              </div>
+            )}
+          </div>
           <div className="fields" style={{ marginTop: 10 }}>
             <label className="field">
               <span>יעד פגישות מינימלי לאדם</span>
@@ -114,7 +130,7 @@ export default function EngineTab(props) {
           )}
           {lastRun && (
             <div className="small mono muted">
-              LAST RUN {new Date(lastRun.at).toLocaleTimeString('he-IL')} · {lastRun.mode} · kept {lastRun.kept} · dropped {lastRun.dropped} · must {lastRun.must} · auto {lastRun.auto} · fairness {lastRun.fallback}
+              LAST RUN {new Date(lastRun.at).toLocaleTimeString('he-IL')} · {lastRun.mode} · kept {lastRun.kept} · dropped {lastRun.dropped} · must {lastRun.must} · auto {lastRun.auto} · fairness {lastRun.fallback}{lastRun.wildcard ? ` · wildcard ${lastRun.wildcard}` : ''}
             </div>
           )}
           {lastRun?.unplacedMust?.length > 0 && (

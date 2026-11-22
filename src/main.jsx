@@ -4,11 +4,12 @@ import App from './App';
 import ParticipantApp from './participant/ParticipantApp';
 import './styles.css';
 
-// ?p=<token> -> participant page; otherwise the staff console
-const token = new URLSearchParams(window.location.search).get('p');
+// Participants: the main link (or ?mode=participant / ?p=<link>) -> mobile page.
+// Staff: ?mode=admin -> production console.
+const mode = new URLSearchParams(window.location.search).get('mode');
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    {token ? <ParticipantApp token={token} /> : <App />}
+    {mode === 'admin' ? <App /> : <ParticipantApp />}
   </React.StrictMode>,
 );

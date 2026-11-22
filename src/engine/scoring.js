@@ -112,6 +112,7 @@ export function explain(m, scores) {
   const score = e?.score ?? m.score ?? 0;
   if (m.source === 'must') return { label: 'Must-match נעול', score, kind: 'lock' };
   if (m.source === 'manual') return { label: 'שיבוץ ידני', score, kind: 'lock' };
+  if (m.source === 'wildcard') return { label: 'Wildcard // היכרות מפתיעה', score, kind: 'wild' };
   const parts = [];
   let kind = 'std';
   if (e?.prefKind === 'mutual') { parts.push('הדדי'); kind = 'mutual'; }

@@ -31,7 +31,7 @@ export const Reason = ({ x, locked }) => (
   <span className="row" style={{ gap: 4 }}>
     {locked && <span className="reason lock">נעול ידנית</span>}
     <span className={`reason ${x.kind}`}>
-      {x.label} <M>// {x.score}%</M>
+      {x.label}{x.kind !== 'wild' && <> <M>// {x.score}%</M></>}
     </span>
   </span>
 );

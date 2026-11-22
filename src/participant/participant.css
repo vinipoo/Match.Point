@@ -45,3 +45,16 @@
 .pp-slot-time { font-size: 13px; display: flex; gap: 6px; align-items: center; }
 .pp-save { position: fixed; bottom: 0; inset-inline: 0; background: var(--char); color: #fff; padding: 12px 16px; text-align: center; font-weight: 600; border-top: var(--bw) solid var(--lime); display: flex; gap: 10px; justify-content: center; align-items: center; }
 .pp-save.error { border-top-color: var(--mag); }
+.pp-link { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; font-size: 13px; padding: 0 4px; margin-inline-start: auto; }
+.pp-login { max-width: 460px; margin: 10px auto; display: flex; flex-direction: column; gap: 12px; }
+.pp-login h1 { font-size: 28px; }
+.pp-pickname { display: flex; gap: 8px; align-items: center; justify-content: space-between; text-align: right; background: var(--card); border: var(--bw) solid var(--line); padding: 12px; font-family: var(--serif); font-size: 18px; font-weight: 700; cursor: pointer; min-height: 48px; }
+.pp-pickname.on { background: var(--lime); color: var(--on-accent); border-color: var(--char); cursor: default; }
+.pp-digits { font-size: 28px; letter-spacing: .4em; text-align: center; }
+.pp-summary { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; font-size: 14px; }
+.pp-seeking { font-size: 14px; border-inline-start: 4px solid var(--mag); padding: 4px 8px; background: var(--soft); }
+.pp-alert { margin: 12px 16px 0; background: var(--mag); color: #fff; border: var(--bw) solid var(--char); padding: 12px; font-size: 15px; display: flex; gap: 8px; align-items: center; box-shadow: -4px 4px 0 var(--char); }
+.pp-alert .pp-link { color: #fff; text-decoration: none; font-size: 16px; }
+.pp-slot.changed { outline: 3px solid var(--mag); outline-offset: 2px; }
+.pp-wild { background: var(--char); color: var(--lime); border-color: var(--char); }
+.pp-nav .pp-refresh { flex: 0 0 48px; font-size: 18px; }

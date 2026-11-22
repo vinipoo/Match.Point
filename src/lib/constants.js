@@ -59,4 +59,7 @@ export const DEFAULT_SETTINGS = {
   liveMode: false,
   includePending: false,
   currentRound: 1,
+  wildcardEnabled: true,
+  wildcardRound: 2,
+  wildcardSeed: 1,
 };

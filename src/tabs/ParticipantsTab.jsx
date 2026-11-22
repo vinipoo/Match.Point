@@ -4,12 +4,12 @@ import ParticipantForm from '../components/ParticipantForm';
 import { SIDES, STATUSES, VENTURE, AVAIL, STAGES } from '../lib/constants';
 
 const blank = (id) => ({
-  _new: true, id, name: '', email: '', phone: '', side: 'tech', status: 'checked_in', brings: '', seeking: '', idea: '',
+  _new: true, id, name: '', email: '', phone: '', side: 'tech', status: 'checked_in', brings: '', seeking: '', idea: '', didPitch: false,
   skills: [], seekSkills: [], industry: [], stage: 'none', ventureMode: 'flex', openToJoin: true, availability: 'part', prefs: [],
 });
 
 export default function ParticipantsTab(props) {
-  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify } = props;
+  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify, togglePitch, pitchedIds, cloud } = props;
   const [q, setQ] = useState('');
   const [side, setSide] = useState('all');
   const [status, setStatus] = useState('all');
@@ -75,6 +75,7 @@ export default function ParticipantsTab(props) {
             <Kpi value={counts.no_show} label="לא הגיעו" tone="mag" size="sm" />
             <Kpi value={counts.pending} label="בהמתנה" tone="ghost" size="sm" />
             <Kpi value={active.length} label="פעילים לשיבוץ" tone="dark" size="sm" />
+            <Kpi value={pitchedIds.length} label={<>הציגו <M>Pitch</M></>} tone="mag" size="sm" />
           </div>
         </Card>
         <Card num="02.B" title="מצב ערב האירוע" en="Live Event Mode">
@@ -114,7 +115,7 @@ export default function ParticipantsTab(props) {
           <table className="tbl">
             <thead>
               <tr>
-                <th>ID</th><th>שם</th><th>צד</th><th>סטטוס הגעה</th><th>פרופיל</th><th>כיוון / זמינות</th>
+                <th>ID</th><th>שם</th><th>צד</th><th>סטטוס הגעה · <M>Pitch</M>{cloud?.key ? ' (מסונכרן לנייד)' : ''}</th><th>פרופיל</th><th>כיוון / זמינות</th>
                 <th>העדפות</th><th>פגישות</th><th>התאמות טובות</th><th />
               </tr>
             </thead>
@@ -134,7 +135,15 @@ export default function ParticipantsTab(props) {
                         {Object.entries(STATUSES).map(([k, v]) => (
                           <button key={k} className={`${k} ${p.status === k ? 'on' : ''}`} onClick={() => setStatusOf(p.id, k)} title={v.en}>{v.he}</button>
                         ))}
-                      </div>
+                      </div>{' '}
+                      <button
+                        className={`btn btn-xs ${p.didPitch ? 'btn-mag' : ''}`}
+                        aria-pressed={!!p.didPitch}
+                        title={p.didPitch ? 'הציג/ה Pitch – לחצו לביטול' : 'סמנו שהציג/ה Pitch'}
+                        onClick={() => togglePitch(p.id)}
+                      >
+                        🎤 Pitch{p.didPitch ? <M> #{pitchedIds.indexOf(p.id) + 1}</M> : null}
+                      </button>
                     </td>
                     <td>
                       {p.idea && <div className="trunc small" style={{ fontWeight: 600 }} title={p.idea}>{p.idea}</div>}

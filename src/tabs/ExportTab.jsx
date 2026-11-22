@@ -4,12 +4,13 @@ import { explain } from '../engine/scoring';
 import { roundTime, roundEnd } from '../engine/scheduler';
 import { EVENT } from '../lib/constants';
 import { participantLink } from '../lib/cloud';
+import LivePublishBar from '../components/LivePublishBar';
 import { exportSchedules, exportMaster, whatsappText, waLink, copyText, personalSchedule } from '../lib/io';
 
 const pad = (n) => String(n).padStart(2, '0');
 
 export default function ExportTab(props) {
-  const { participants, byId, settings, meetings, scores, active, notify, setTab, stats, cloud } = props;
+  const { participants, byId, settings, meetings, scores, active, notify, setTab, stats, cloud, publishLive, openQr, boardDirty } = props;
   const linkOf = (id) => participantLink(cloud?.tokens?.[id]);
   const [wa, setWa] = useState(null);
   const [q, setQ] = useState('');
@@ -26,7 +27,10 @@ export default function ExportTab(props) {
   return (
     <div className="stack">
       <div className="no-print">
-        <Card num="05.A" title="ייצוא והפצה" en="Export">
+        <Card num="06.A" title="ייצוא והפצה" en="Export">
+          <div style={{ marginBottom: 14 }}>
+            <LivePublishBar publishLive={publishLive} openQr={openQr} boardDirty={boardDirty} cloud={cloud} meetings={meetings} />
+          </div>
           <div className="row">
             <button className="btn btn-lime btn-lg" onClick={() => window.print()}>⎙ הדפסה / שמירה כ-<M>PDF</M> (דף צוות)</button>
             <button className="btn btn-dark" onClick={() => exportSchedules({ ...args, format: 'xlsx' })}>לו"זים אישיים <M>XLSX</M></button>

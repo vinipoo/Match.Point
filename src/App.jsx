@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { EVENT, DEFAULT_SETTINGS, DEFAULT_WEIGHTS } from './lib/constants';
 import { computeScores, pairKey } from './engine/scoring';
-import { schedule, scheduleStats, analyzeGaps, activeIds } from './engine/scheduler';
+import { schedule, scheduleStats, analyzeGaps, activeIds, roundTime, roundEnd } from './engine/scheduler';
+import { adminApi, boardHash } from './lib/cloud';
+import QrModal from './components/QrModal';
 import { M } from './components/ui';
 import SetupTab from './tabs/SetupTab';
 import ParticipantsTab from './tabs/ParticipantsTab';
@@ -113,11 +115,57 @@ export default function App() {
     setConstraints((c) => ({ ...c, [type]: c[type].filter(([x, y]) => pairKey(x, y) !== k) }));
   }, []);
 
+  // ── Pitch: local source of truth, mirrored to the cloud so phones show the badge ──
+  const pitchedIds = useMemo(
+    () => participants.filter((p) => p.didPitch).sort((a, b) => (a.pitchAt || 0) - (b.pitchAt || 0)).map((p) => p.id),
+    [participants],
+  );
+  const togglePitch = useCallback((id) => setParticipants((ps) => ps.map((p) => (
+    p.id === id ? { ...p, didPitch: !p.didPitch, pitchAt: p.didPitch ? null : Date.now() } : p
+  ))), []);
+  const [pitchSync, setPitchSync] = useState(null);
+  const pitchKey = pitchedIds.join(',');
+  const firstPitchRun = useRef(true);
+  useEffect(() => {
+    if (firstPitchRun.current) { firstPitchRun.current = false; return undefined; } // don't overwrite the cloud on page load
+    if (!cloud.key) return undefined;
+    const h = setTimeout(() => {
+      adminApi(cloud.key).setPitched(pitchKey ? pitchKey.split(',') : [])
+        .then(() => setPitchSync({ ok: true, at: new Date().toISOString() }))
+        .catch((e) => setPitchSync({ ok: false, error: e.message }));
+    }, 400);
+    return () => clearTimeout(h);
+  }, [pitchKey, cloud.key]);
+
+  // ── 🚀 publish the current board to every participant's phone ──
+  const publishLive = useCallback(async () => {
+    if (!cloud.key) { notify('יש להתחבר לענן בטאב 03 (מפתח צוות) לפני פרסום', 'err'); setTab('live'); return false; }
+    if (!visibleMeetings.length) { notify('אין לוח שיבוץ לפרסום', 'err'); return false; }
+    try {
+      const hash = boardHash(visibleMeetings);
+      await adminApi(cloud.key).publishSchedule({
+        meetings: visibleMeetings.map(({ round, table, a, b, source }) => ({ round, table, a, b, wild: source === 'wildcard' })),
+        times: Array.from({ length: settings.rounds }, (_, i) => ({ round: i + 1, start: roundTime(settings, i + 1), end: roundEnd(settings, i + 1) })),
+        hash,
+      });
+      setCloud((c) => ({ ...c, publishedHash: hash, publishedAt: new Date().toISOString() }));
+      notify('🚀 הלו״ז פורסם – הטלפונים של המשתתפים מתעדכנים עכשיו');
+      return true;
+    } catch (e) {
+      notify(e.message, 'err');
+      return false;
+    }
+  }, [cloud.key, visibleMeetings, settings, notify]);
+  const [qrOpen, setQrOpen] = useState(false);
+  const openQr = useCallback(() => setQrOpen(true), []);
+  const boardDirty = !!cloud.publishedHash && cloud.publishedHash !== boardHash(visibleMeetings);
+
   const ctx = {
     participants, setParticipants, byId, settings, setSettings, weights, setWeights,
     constraints, setConstraints, addConstraint, removeConstraint,
     meetings: visibleMeetings, setMeetings, scores, active, gaps, stats, broken, lastRun, run, notify, setTab,
     cloud, setCloud, snapshot, restore,
+    pitchedIds, togglePitch, pitchSync, publishLive, openQr, boardDirty,
   };
 
   const checkedIn = participants.filter((p) => p.status === 'checked_in').length;
@@ -174,6 +222,7 @@ export default function App() {
         {tab === 'export' && <ExportTab {...ctx} />}
       </main>
 
+      {qrOpen && <QrModal onClose={() => setQrOpen(false)} />}
       {toast && <div className={`toast ${toast.kind === 'err' ? 'err' : ''}`} role="status">{toast.msg}</div>}
     </>
   );

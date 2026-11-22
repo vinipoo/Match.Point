@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, M, SideTag, Reason, Alert, Empty } from '../components/ui';
 import { explain, pairKey, BLOCK_REASONS } from '../engine/scoring';
 import { roundTime, roundEnd } from '../engine/scheduler';
+import LivePublishBar from '../components/LivePublishBar';
 
 const pad = (n) => String(n).padStart(2, '0');
 let seq = 0;
@@ -13,7 +14,7 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
   const x = explain(m, scores);
   const broken = !activeSet.has(m.a) || !activeSet.has(m.b);
   return (
-    <div className={`tcard ${m.locked ? 'locked' : ''} ${x.kind === 'mutual' ? 'mutual' : ''}`} style={broken ? { borderColor: 'var(--mag)', borderStyle: 'dashed' } : undefined}>
+    <div className={`tcard ${m.locked ? 'locked' : ''} ${x.kind === 'mutual' ? 'mutual' : ''} ${x.kind === 'wild' ? 'wild' : ''}`} style={broken ? { borderColor: 'var(--mag)', borderStyle: 'dashed' } : undefined}>
       <div className="tcard-h">
         <div className="tno"><small>שולחן</small>{pad(m.table)}</div>
         <div className="acts">
@@ -49,7 +50,7 @@ function TableCard({ m, byId, scores, settings, activeSet, onLock, onCancel, onT
 }
 
 export default function BoardTab(props) {
-  const { participants, byId, settings, setSettings, meetings, setMeetings, scores, active, run, addConstraint, notify, broken, setTab } = props;
+  const { participants, byId, settings, setSettings, meetings, setMeetings, scores, active, run, addConstraint, notify, broken, setTab, publishLive, openQr, boardDirty, cloud } = props;
   const [round, setRound] = useState(Math.min(settings.currentRound || 1, settings.rounds));
   const [view, setView] = useState('tables');
   const [pa, setPa] = useState('');
@@ -130,6 +131,8 @@ export default function BoardTab(props) {
           <button className="btn btn-mag" onClick={() => run('preserve')}>↻ שיבוץ מחדש (שמור קיימות)</button>
         </div>
       </div>
+
+      <LivePublishBar publishLive={publishLive} openQr={openQr} boardDirty={boardDirty} cloud={cloud} meetings={meetings} />
 
       {broken.length > 0 && (
         <Alert tone="warn" icon={broken.length} title="פגישות עם משתתפים שאינם פעילים (No-show / ביטול)"

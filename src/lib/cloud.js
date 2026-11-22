@@ -30,6 +30,8 @@ export const adminApi = (key) => ({
 export const participantApi = {
   load: (t) => call(`/api/participant?t=${encodeURIComponent(t)}`),
   savePrefs: (t, list) => call('/api/participant', { method: 'POST', body: { t, list } }),
+  directory: () => call('/api/participant?action=directory'),
+  login: (id, last4) => call('/api/participant', { method: 'POST', body: { action: 'login', id, last4 } }),
 };
 
 export const participantLink = (token) =>

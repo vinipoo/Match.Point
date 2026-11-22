@@ -30,6 +30,7 @@ const ALIASES = {
   prefs: ['preferences', 'prefs', 'want_to_meet', 'העדפות', 'רוצה לפגוש'],
   must: ['must_match', 'must', 'פגישות נעולות', 'נעול'],
   exclude: ['exclude', 'החרגה', 'לא לשבץ עם'],
+  didPitch: ['did_pitch', 'didpitch', 'pitch', 'pitched', 'הציג pitch', 'הציג/ה pitch', "הציג פיצ'", "הציג/ה פיצ'", "מציג פיצ'", "פיצ'", 'פיץ'],
 };
 
 // Long Google-Form questions, matched by prefix (duplicate headers arrive as "…_1")
@@ -39,6 +40,9 @@ const PREFIX_ALIASES = [
   ['experience', 'מה כבר עשית בפועל'],
   ['industry', 'מה הדומיין'],
   ['industryNote', 'פרט/י'],
+  ['didPitch', 'האם מציג'],
+  ['didPitch', 'האם הציג'],
+  ['didPitch', 'האם תציג'],
 ];
 
 // Experience answers from the registration form -> skill tag + venture stage
@@ -82,7 +86,7 @@ const mapVal = (field, v, def) => {
   }
   return def;
 };
-const truthy = (v) => ['1', 'true', 'yes', 'y', 'כן', 'v', '✓'].includes(norm(v));
+const truthy = (v) => ['1', 'true', 'yes', 'y', 'כן', 'v', '✓', '✔', 'x', 'הציג', 'הציגה'].includes(norm(v));
 
 export async function readFile(file) {
   let wb;
@@ -179,6 +183,7 @@ export function mapRows(rows) {
       ventureMode: mapVal('ventureMode', r.ventureMode, 'flex'),
       openToJoin: truthy(r.openToJoin),
       availability: mapVal('availability', r.availability, 'part'),
+      didPitch: truthy(lastFormAnswer(r.didPitch)),
       prefs,
     };
   });
@@ -203,14 +208,14 @@ function downloadBlob(content, filename, type) {
 const downloadCSV = (ws, filename) => downloadBlob('﻿' + XLSX.utils.sheet_to_csv(ws), filename, 'text/csv;charset=utf-8');
 
 export const TEMPLATE_HEADERS = [
-  'id', 'name', 'email', 'phone', 'side', 'status', 'brings', 'seeking', 'idea', 'skills', 'seek_skills',
+  'id', 'name', 'email', 'phone', 'side', 'status', 'did_pitch', 'brings', 'seeking', 'idea', 'skills', 'seek_skills',
   'industry', 'stage', 'venture_mode', 'open_to_join', 'availability', 'preferences', 'must_match', 'exclude',
 ];
 
 export function participantRows(participants, constraints = { must: [], exclude: [] }) {
   const pairsOf = (list, id) => list.filter((p) => p.includes(id)).map(([a, b]) => (a === id ? b : a));
   return participants.map((p) => ({
-    id: p.id, name: p.name, email: p.email, phone: p.phone, side: p.side, status: p.status,
+    id: p.id, name: p.name, email: p.email, phone: p.phone, side: p.side, status: p.status, did_pitch: p.didPitch ? 'yes' : 'no',
     brings: p.brings, seeking: p.seeking, idea: p.idea || '', skills: joinList(p.skills), seek_skills: joinList(p.seekSkills),
     industry: joinList(p.industry), stage: p.stage, venture_mode: p.ventureMode, open_to_join: p.openToJoin ? 'yes' : 'no',
     availability: p.availability,
@@ -220,16 +225,39 @@ export function participantRows(participants, constraints = { must: [], exclude:
   }));
 }
 
+const TEMPLATE_HELP = [
+  ['id', 'מזהה ייחודי (P01, P02…). ריק = יוקצה אוטומטית'],
+  ['name', 'שם מלא (חובה). אפשר גם עמודות נפרדות: שם פרטי / שם משפחה'],
+  ['email / phone', 'פרטי קשר – לא מוצגים למשתתפים אחרים. 4 הספרות האחרונות של הטלפון משמשות לכניסה מהנייד'],
+  ['side', 'tech / business / both (או: טכנולוגי / עסקי / היברידי)'],
+  ['status', 'confirmed / checked-in / no-show / pending (או: מאושר / הגיע / לא הגיע / בהמתנה)'],
+  ['did_pitch', 'yes / no – האם הציג/ה Pitch. אפשר לעדכן גם בזמן האירוע בטאב 02'],
+  ['brings / seeking / idea', 'מה מביא/ה לשולחן · איזה שותף/ה מחפש/ת · המיזם או הרעיון'],
+  ['skills / seek_skills / industry', 'רשימות מופרדות ב-; (למשל: SaaS; פינטק)'],
+  ['stage', 'none / idea / mvp / growth'],
+  ['venture_mode / open_to_join', 'own / join / new / flex · yes / no'],
+  ['availability', 'full / part / evenings'],
+  ['preferences', 'את מי רוצה לפגוש, לפי עדיפות: P03:1; P07:2 (או שמות מלאים)'],
+  ['must_match / exclude', 'מזהים לנעילה מראש / להחרגה'],
+];
+
 export function downloadTemplate() {
-  const ws = XLSX.utils.json_to_sheet([
-    {
-      id: 'P01', name: 'ישראל ישראלי', email: 'israel@example.com', phone: '050-0000000', side: 'tech', status: 'confirmed',
-      brings: 'Full-Stack, 8 שנות ניסיון', seeking: 'שותף/ה עסקי/ת למכירות', skills: 'Full-Stack; ענן', seek_skills: 'מכירות B2B; גיוס הון',
-      industry: 'SaaS; פינטק', stage: 'none', venture_mode: 'new', open_to_join: 'yes', availability: 'full',
-      preferences: 'P02:1; P05:2', must_match: '', exclude: '',
-    },
-  ], { header: TEMPLATE_HEADERS });
-  downloadCSV(ws, 'matchpoint-template.csv');
+  const base = { email: '', phone: '', status: 'confirmed', did_pitch: 'no', open_to_join: 'yes', must_match: '', exclude: '' };
+  const rows = [
+    { ...base, id: 'P01', name: 'ישראל ישראלי', email: 'israel@example.com', phone: '050-0000001', side: 'tech', did_pitch: 'yes',
+      brings: 'Full-Stack, 8 שנות ניסיון', seeking: 'שותף/ה עסקי/ת למכירות וגיוס', idea: 'פלטפורמת AI לניהול מלאי', skills: 'Full-Stack; ענן',
+      seek_skills: 'מכירות B2B; גיוס הון', industry: 'SaaS; AI / Data', stage: 'mvp', venture_mode: 'own', availability: 'full', preferences: 'P02:1; P03:2' },
+    { ...base, id: 'P02', name: 'דנה כהן', email: 'dana@example.com', phone: '050-0000002', side: 'business',
+      brings: 'VP Sales לשעבר בחברת SaaS', seeking: 'CTO שיבנה איתי מוצר מאפס', idea: '', skills: 'מכירות B2B; Go-To-Market',
+      seek_skills: 'Full-Stack; AI/ML', industry: 'SaaS; פיננסים', stage: 'none', venture_mode: 'new', availability: 'full', preferences: 'P01:1' },
+    { ...base, id: 'P03', name: 'נועם לוי', email: 'noam@example.com', phone: '050-0000003', side: 'both',
+      brings: 'מנהל מוצר עם רקע בפיתוח', seeking: 'שותף/ה עם ניסיון שיווקי', idea: 'אפליקציה לקהילות כושר', skills: 'ניהול מוצר; Frontend',
+      seek_skills: 'שיווק דיגיטלי', industry: 'Lifestyle', stage: 'idea', venture_mode: 'flex', availability: 'part', preferences: '' },
+  ];
+  const wb = bookRTL(XLSX.utils.book_new());
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, { header: TEMPLATE_HEADERS }), 'participants');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['עמודה', 'הסבר'], ...TEMPLATE_HELP]), 'הסבר');
+  XLSX.writeFile(wb, 'matchpoint-template.xlsx');
 }
 
 export function exportParticipants(participants, constraints) {

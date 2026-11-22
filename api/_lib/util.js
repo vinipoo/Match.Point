@@ -5,6 +5,8 @@ export const K = {
   event: 'mp:event',
   roster: 'mp:roster',
   tokens: 'mp:tokens', // token -> participant id
+  auth: 'mp:auth', // participant id -> last 4 phone digits (private, for login)
+  login: (id) => `mp:login:${id}`, // failed-login counter
   pitched: 'mp:pitched',
   schedule: 'mp:schedule',
   staff: 'mp:staff',
@@ -64,4 +66,7 @@ export const publicProfile = (p) => ({
   industry: Array.isArray(p.industry) ? p.industry.map(String) : [],
   idea: String(p.idea || ''),
   brings: String(p.brings || ''),
+  seeking: String(p.seeking || ''),
+  stage: String(p.stage || ''),
+  seeksSide: ['tech', 'business', 'both', 'any'].includes(p.seeksSide) ? p.seeksSide : 'any',
 });

@@ -5,9 +5,124 @@ import { M, SideTag } from '../components/ui';
 import './participant.css';
 
 const pad = (n) => String(n).padStart(2, '0');
-const POLL_MS = 8000;
+const POLL_MS = 10000;
+const TOKEN_KEY = 'mp-participant-token';
+const looksLikeToken = (v) => /^[A-Za-z0-9]{12}$/.test(v || '') && !/^P\d+$/i.test(v || '');
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+  del: (k) => { try { localStorage.removeItem(k); } catch { /* private mode */ } },
+  json: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+};
+const toMin = (s) => { const [h, m] = String(s || '0:0').split(':').map(Number); return h * 60 + m; };
 
-function ProfileCard({ p, rank, pitched, canAdd, open, onToggle }) {
+function Shell({ children, me, onLogout }) {
+  return (
+    <div className="pp">
+      <header className="pp-hdr">
+        <div className="pp-hdr-row">
+          <M className="brand">{EVENT.brand}</M>
+          <M className="pp-date">{EVENT.date} · {EVENT.venueEn}</M>
+        </div>
+        {me && (
+          <div className="pp-me">
+            <span>שלום, <b>{me.name}</b></span> <M className="pp-id inv">{me.id}</M> <SideTag side={me.side} />
+            <button className="pp-link" onClick={onLogout}>לא את/ה?</button>
+          </div>
+        )}
+      </header>
+      {children}
+    </div>
+  );
+}
+
+// ───────────── login: name + last 4 phone digits ─────────────
+function Login({ prefillId, onLoggedIn }) {
+  const [dir, setDir] = useState(null);
+  const [err, setErr] = useState('');
+  const [q, setQ] = useState('');
+  const [sel, setSel] = useState(null);
+  const [digits, setDigits] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    participantApi.directory()
+      .then((d) => {
+        setDir(d.participants);
+        const pre = prefillId && d.participants.find((p) => p.id.toLowerCase() === prefillId.toLowerCase());
+        if (pre) setSel(pre);
+      })
+      .catch((e) => setErr(e.message));
+  }, [prefillId]);
+
+  const matches = useMemo(() => {
+    const t = q.trim().toLowerCase();
+    if (!dir || !t) return [];
+    return dir.filter((p) => p.name.toLowerCase().includes(t) || p.id.toLowerCase() === t).slice(0, 8);
+  }, [dir, q]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!sel || digits.length !== 4) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const r = await participantApi.login(sel.id, digits);
+      onLoggedIn(r.token);
+    } catch (e2) {
+      setErr(e2.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Shell>
+      <main className="pp-main">
+        <div className="pp-login">
+          <h1>כניסה לערב</h1>
+          <p className="small muted">בחרו את השם שלכם ואמתו עם 4 הספרות האחרונות של הטלפון.</p>
+          {!dir && !err && <div className="pp-banner">טוען…</div>}
+          {dir && dir.length === 0 && <div className="pp-banner">רשימת המשתתפים עוד לא פורסמה. נסו שוב בעוד רגע.</div>}
+          {dir && dir.length > 0 && (
+            <form onSubmit={submit} className="pp-stack">
+              {!sel ? (
+                <>
+                  <input className="input" autoFocus placeholder="הקלידו את השם שלכם…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש שם" />
+                  <div className="pp-stack" style={{ gap: 6 }}>
+                    {matches.map((p) => (
+                      <button type="button" key={p.id} className="pp-pickname" onClick={() => setSel(p)}>
+                        <span>{p.name}</span> <M className="pp-id">{p.id}</M>
+                      </button>
+                    ))}
+                    {q.trim() && matches.length === 0 && <div className="small muted">לא נמצא. נסו חלק מהשם, או פנו לצוות.</div>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="pp-pickname on">
+                    <span>{sel.name}</span> <M className="pp-id">{sel.id}</M>
+                    <button type="button" className="pp-link" onClick={() => { setSel(null); setDigits(''); }}>שינוי</button>
+                  </div>
+                  <label className="field">
+                    <span>4 הספרות האחרונות של הטלפון</span>
+                    <input className="input mono pp-digits" inputMode="numeric" autoComplete="off" maxLength={4} autoFocus
+                      value={digits} onChange={(e) => setDigits(e.target.value.replace(/\D/g, '').slice(0, 4))} />
+                  </label>
+                  <button className="btn btn-lime pp-pick" disabled={busy || digits.length !== 4}>{busy ? 'נכנס…' : 'כניסה'}</button>
+                </>
+              )}
+            </form>
+          )}
+          {err && <div className="pp-banner warn" role="alert">{err}</div>}
+        </div>
+      </main>
+    </Shell>
+  );
+}
+
+// ───────────── profile card ─────────────
+function ProfileCard({ p, rank, canAdd, open, onToggle }) {
   const [more, setMore] = useState(false);
   return (
     <article className={`pp-card ${rank ? 'chosen' : ''}`}>
@@ -15,24 +130,23 @@ function ProfileCard({ p, rank, pitched, canAdd, open, onToggle }) {
         <M className="pp-id">{p.id}</M>
         <div className="pp-name">{p.name}</div>
         <SideTag side={p.side} />
-        {pitched && <span className="tag tag-mag">הציג/ה Pitch</span>}
+        {p.pitched && <span className="tag tag-mag">🎤 הציג/ה Pitch</span>}
       </div>
-      {p.industry?.length > 0 && (
-        <div className="chips">{p.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>
+      {(p.brings || p.stage) && (
+        <div className="pp-summary">
+          {p.brings && <span><b>מביא/ה: </b>{p.brings}</span>}
+          {p.stage && <span className="tag">שלב: {p.stage}</span>}
+        </div>
       )}
-      {(p.idea || p.brings) && (
+      {p.seeking && <div className="pp-seeking"><b>מחפש/ת: </b>{p.seeking}</div>}
+      {p.idea && (
         <button type="button" className={`pp-text ${more ? 'open' : ''}`} onClick={() => setMore((v) => !v)} aria-expanded={more}>
-          {p.idea && <span className="pp-idea"><b>המיזם: </b>{p.idea}</span>}
-          {p.brings && <span className="pp-brings"><b>ניסיון: </b>{p.brings}</span>}
+          <span className="pp-idea"><b>המיזם: </b>{p.idea}</span>
         </button>
       )}
+      {p.industry?.length > 0 && <div className="chips">{p.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>}
       {open && (
-        <button
-          type="button"
-          className={`btn pp-pick ${rank ? 'btn-lime' : ''}`}
-          disabled={!rank && !canAdd}
-          onClick={() => onToggle(p.id)}
-        >
+        <button type="button" className={`btn pp-pick ${rank ? 'btn-lime' : ''}`} disabled={!rank && !canAdd} onClick={() => onToggle(p.id)}>
           {rank ? <>✓ בחירה מס׳ <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : 'הגעת למקסימום בחירות'}
         </button>
       )}
@@ -40,51 +154,65 @@ function ProfileCard({ p, rank, pitched, canAdd, open, onToggle }) {
   );
 }
 
-export default function ParticipantApp({ token }) {
+// ───────────── logged-in portal ─────────────
+function Portal({ token, onLogout, onInvalid }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [list, setList] = useState([]);
-  const [save, setSave] = useState({ state: 'idle', at: null });
+  const [save, setSave] = useState({ state: 'idle' });
   const [view, setView] = useState('browse');
   const [q, setQ] = useState('');
   const [side, setSide] = useState('all');
   const [industry, setIndustry] = useState('');
-  const [pitchedOnly, setPitchedOnly] = useState(false);
+  const [pitchOnly, setPitchOnly] = useState(false);
+  const [forMe, setForMe] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [changed, setChanged] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
   const dirty = useRef(false);
   const offset = useRef(0);
   const saveTimer = useRef(null);
-  const autoView = useRef(false);
   const hasData = useRef(false);
 
   const load = useCallback(async () => {
     try {
       const d = await participantApi.load(token);
       offset.current = Date.parse(d.serverNow) - Date.now();
+      hasData.current = true;
       setData(d);
       setError('');
-      if (!dirty.current) {
-        setList(d.prefs || []);
-        if (d.prefsAt) setSave((s) => (s.state === 'idle' || s.state === 'saved' ? { state: 'saved', at: d.prefsAt } : s));
-      }
-      hasData.current = true;
-      if (d.schedule && !autoView.current) { autoView.current = true; setView('schedule'); }
+      if (!dirty.current) setList(d.prefs || []);
     } catch (e) {
-      // keep showing the last good data on a transient network error
-      if (e.status === 404 || !hasData.current) setError(e.message);
+      if (e.status === 404) onInvalid();
+      else if (!hasData.current) setError(e.message);
     }
-  }, [token]);
+  }, [token, onInvalid]);
 
   useEffect(() => {
     load();
     const h = setInterval(load, POLL_MS);
     return () => clearInterval(h);
   }, [load]);
-
   useEffect(() => {
     const h = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(h);
   }, []);
+
+  // new schedule version -> jump to "my schedule" and flag changes in upcoming rounds
+  useEffect(() => {
+    if (!data?.schedule || !data.publishedAt) return;
+    const key = `mp-sched-${data.me.id}`;
+    const prev = store.json(key);
+    if (prev?.publishedAt === data.publishedAt) return;
+    const slots = Object.fromEntries(data.schedule.map((s) => [s.round, `${s.table ?? '-'}|${s.partner?.id ?? 'free'}`]));
+    if (prev?.slots) {
+      const d = new Date(Date.now() + offset.current);
+      const nowMin = d.getHours() * 60 + d.getMinutes();
+      setChanged(data.schedule.filter((s) => prev.slots[s.round] !== undefined && prev.slots[s.round] !== slots[s.round] && toMin(s.end) > nowMin).map((s) => s.round));
+    }
+    store.set(key, JSON.stringify({ publishedAt: data.publishedAt, slots }));
+    setView('schedule');
+  }, [data]);
 
   const phase = data?.event.phase || 'setup';
   const closesAt = data?.event.closesAt ? Date.parse(data.event.closesAt) : null;
@@ -94,7 +222,7 @@ export default function ParticipantApp({ token }) {
 
   const persist = useCallback((next) => {
     dirty.current = true;
-    setSave({ state: 'saving', at: null });
+    setSave({ state: 'saving' });
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       try {
@@ -102,7 +230,7 @@ export default function ParticipantApp({ token }) {
         dirty.current = false;
         setSave({ state: 'saved', at: r.at });
       } catch (e) {
-        setSave({ state: 'error', at: null, msg: e.message });
+        setSave({ state: 'error', msg: e.message });
         if (e.status === 409) { dirty.current = false; load(); }
       }
     }, 450);
@@ -118,79 +246,68 @@ export default function ParticipantApp({ token }) {
     update(next);
   };
 
-  const byId = useMemo(() => Object.fromEntries((data?.roster || []).map((p) => [p.id, p])), [data]);
   const pitchedSet = useMemo(() => new Set(data?.pitched || []), [data]);
-  const industries = useMemo(() => [...new Set((data?.roster || []).flatMap((p) => p.industry || []))].sort(), [data]);
+  const roster = useMemo(() => (data?.roster || []).map((p) => ({ ...p, pitched: pitchedSet.has(p.id) })), [data, pitchedSet]);
+  const byId = useMemo(() => Object.fromEntries(roster.map((p) => [p.id, p])), [roster]);
+  const industries = useMemo(() => [...new Set(roster.flatMap((p) => p.industry || []))].sort(), [roster]);
+  const me = data?.me;
+  const looksForMe = useCallback(
+    (p) => !me || me.side === 'both' || ['any', 'both', me.side].includes(p.seeksSide || 'any'),
+    [me],
+  );
 
   const shown = useMemo(() => {
     if (!data) return [];
     const t = q.trim().toLowerCase();
     const order = new Map((data.pitched || []).map((id, i) => [id, i]));
-    return data.roster
+    return roster
       .filter((p) => p.id !== data.me.id)
       .filter((p) => side === 'all' || p.side === side)
       .filter((p) => !industry || (p.industry || []).includes(industry))
-      .filter((p) => !pitchedOnly || pitchedSet.has(p.id))
-      .filter((p) => !t || [p.name, p.id, p.idea, p.brings, ...(p.industry || [])].join(' ').toLowerCase().includes(t))
+      .filter((p) => !pitchOnly || p.pitched)
+      .filter((p) => !forMe || looksForMe(p))
+      .filter((p) => !t || [p.name, p.id, p.idea, p.brings, p.seeking, ...(p.industry || [])].join(' ').toLowerCase().includes(t))
       .sort((a, b) => (order.has(a.id) ? order.get(a.id) : 1e6) - (order.has(b.id) ? order.get(b.id) : 1e6) || a.id.localeCompare(b.id, 'en', { numeric: true }));
-  }, [data, q, side, industry, pitchedOnly, pitchedSet]);
+  }, [data, roster, q, side, industry, pitchOnly, forMe, looksForMe]);
 
-  if (error && !data) {
-    return (
-      <div className="pp">
-        <header className="pp-hdr"><M className="brand">{EVENT.brand}</M></header>
-        <main className="pp-main"><div className="pp-banner warn"><b>{error}</b></div></main>
-      </div>
-    );
-  }
-  if (!data) return <div className="pp"><main className="pp-main"><div className="pp-banner">טוען…</div></main></div>;
+  const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
-  const currentRound = (() => {
-    if (!data.schedule) return null;
-    const d = new Date(now + offset.current);
-    const mins = d.getHours() * 60 + d.getMinutes();
-    const toMin = (s) => { const [h, m] = s.split(':').map(Number); return h * 60 + m; };
-    const cur = data.schedule.find((s) => mins >= toMin(s.start) - 2 && mins < toMin(s.end));
-    return cur?.round ?? null;
-  })();
+  if (error && !data) return <Shell><main className="pp-main"><div className="pp-banner warn">{error}</div></main></Shell>;
+  if (!data) return <Shell><main className="pp-main"><div className="pp-banner">טוען…</div></main></Shell>;
+
+  const d = new Date(now + offset.current);
+  const nowMin = d.getHours() * 60 + d.getMinutes();
+  const currentRound = data.schedule?.find((s) => nowMin >= toMin(s.start) - 2 && nowMin < toMin(s.end))?.round ?? null;
 
   return (
-    <div className="pp">
-      <header className="pp-hdr">
-        <div className="pp-hdr-row">
-          <M className="brand">{EVENT.brand}</M>
-          <M className="pp-date">{EVENT.date}</M>
+    <Shell me={data.me} onLogout={onLogout}>
+      {changed.length > 0 && (
+        <div className="pp-alert" role="alert">
+          <b>הלו״ז שלך עודכן!</b> שים/י לב לשינוי {changed.length > 1 ? 'בסבבים' : 'בסבב'} <M>{changed.join(', ')}</M>
+          <button className="pp-link" onClick={() => setChanged([])} aria-label="סגור התראה">✕</button>
         </div>
-        <div className="pp-me">
-          <span>שלום, <b>{data.me.name}</b></span> <M className="pp-id inv">{data.me.id}</M> <SideTag side={data.me.side} />
-        </div>
-      </header>
-
-      {phase === 'setup' && (
-        <div className="pp-banner">בחירת האנשים תיפתח בהפסקה שאחרי הפיצ׳ים. בינתיים אפשר לעיין בפרופילים.</div>
       )}
-      {phase === 'open' && isOpen && (
+      {phase === 'setup' && <div className="pp-banner">בחירת האנשים תיפתח בהפסקה שאחרי הפיצ׳ים. בינתיים אפשר לעיין בפרופילים.</div>}
+      {isOpen && (
         <div className="pp-banner live">
-          <div><b>בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">מסודרים לפי עדיפות: מס׳ 1 = הכי חשוב</div></div>
+          <div><b>בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">לפי עדיפות: מס׳ 1 = הכי חשוב</div></div>
           <M className="pp-count">{countdown(left)}</M>
         </div>
       )}
-      {(phase === 'closed' || (phase === 'open' && !isOpen)) && (
-        <div className="pp-banner">ההגשה נסגרה ✓ השיבוץ בהכנה – הלו״ז האישי יופיע כאן בעוד כמה דקות.</div>
-      )}
-      {phase === 'published' && !data.schedule && <div className="pp-banner">הלו״ז מתעדכן…</div>}
+      {(phase === 'closed' || (phase === 'open' && !isOpen)) && <div className="pp-banner">ההגשה נסגרה ✓ השיבוץ בהכנה – הלו״ז יופיע כאן אוטומטית.</div>}
 
       <nav className="pp-nav">
         {data.schedule && <button className={view === 'schedule' ? 'on' : ''} onClick={() => setView('schedule')}>הלו״ז שלי</button>}
-        <button className={view === 'browse' ? 'on' : ''} onClick={() => setView('browse')}>משתתפים <M>{data.roster.length - 1}</M></button>
+        <button className={view === 'browse' ? 'on' : ''} onClick={() => setView('browse')}>משתתפים <M>{roster.length - 1}</M></button>
         <button className={view === 'mine' ? 'on' : ''} onClick={() => setView('mine')}>הבחירות שלי <M>{list.length}/{max}</M></button>
+        <button className="pp-refresh" onClick={refresh} aria-label="רענון" title="רענון">{refreshing ? '…' : '↻'}</button>
       </nav>
 
       <main className="pp-main">
         {view === 'schedule' && data.schedule && (
           <div className="pp-stack">
             {data.schedule.map((s) => (
-              <div key={s.round} className={`pp-slot ${s.round === currentRound ? 'now' : ''} ${s.partner ? '' : 'free'}`}>
+              <div key={s.round} className={`pp-slot ${s.round === currentRound ? 'now' : ''} ${s.partner ? '' : 'free'} ${changed.includes(s.round) ? 'changed' : ''}`}>
                 <div className="pp-slot-side">
                   <div className="small">שולחן</div>
                   <M className="pp-table">{s.table ? pad(s.table) : '—'}</M>
@@ -199,19 +316,21 @@ export default function ParticipantApp({ token }) {
                   <div className="pp-slot-time">
                     סבב <M>{pad(s.round)}</M> · <M>{s.start}–{s.end}</M>
                     {s.round === currentRound && <span className="tag tag-mag">עכשיו</span>}
+                    {s.wild && <span className="tag pp-wild">Wildcard ✨ היכרות מפתיעה</span>}
                   </div>
                   {s.partner ? (
                     <>
                       <div className="pp-name">{s.partner.name} <SideTag side={s.partner.side} /></div>
-                      {s.partner.idea && <div className="small">{s.partner.idea}</div>}
+                      {s.partner.industry?.length > 0 && <div className="chips">{s.partner.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>}
+                      {(s.partner.idea || s.partner.brings) && <div className="small pp-clamp">{s.partner.idea || s.partner.brings}</div>}
                     </>
                   ) : (
-                    <div className="pp-name muted">נטוורקינג חופשי ☕</div>
+                    <div className="pp-name muted">סבב נטוורקינג חופשי – גשו לבר / לאזור המינגלינג ☕</div>
                   )}
                 </div>
               </div>
             ))}
-            <p className="small muted">הלו״ז עשוי להתעדכן אם מישהו לא הגיע – הדף מתרענן לבד.</p>
+            <p className="small muted">הלו״ז מתעדכן אוטומטית אם מישהו לא הגיע.</p>
           </div>
         )}
 
@@ -226,7 +345,7 @@ export default function ParticipantApp({ token }) {
                   <M className="pp-rank-no">{i + 1}</M>
                   <div className="pp-rank-body">
                     <div className="pp-name">{p.name} <SideTag side={p.side} /></div>
-                    {p.idea && <div className="small muted pp-clamp">{p.idea}</div>}
+                    {(p.idea || p.brings) && <div className="small muted pp-clamp">{p.idea || p.brings}</div>}
                   </div>
                   {isOpen && (
                     <div className="pp-rank-acts">
@@ -243,10 +362,17 @@ export default function ParticipantApp({ token }) {
 
         {view === 'browse' && (
           <div className="pp-stack">
-            <input className="input" placeholder="חיפוש שם, מזהה, מיזם או תחום…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input className="input" placeholder="חיפוש חופשי: שם, מזהה, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
             <div className="pp-filters">
-              <div className="seg">
-                {[['all', 'הכול'], ['tech', SIDES.tech.he], ['business', SIDES.business.he]].map(([k, l]) => (
+              <button className={`btn btn-sm ${forMe ? 'btn-lime' : ''}`} aria-pressed={forMe} onClick={() => setForMe((v) => !v)}>🎯 התאמות שמחפשות אותי</button>
+              <div className="seg" role="group" aria-label="Pitch">
+                <button className={!pitchOnly ? 'on confirmed' : ''} onClick={() => setPitchOnly(false)}>כולם</button>
+                <button className={pitchOnly ? 'on no_show' : ''} onClick={() => setPitchOnly(true)}>רק מציגי <M>Pitch</M></button>
+              </div>
+            </div>
+            <div className="pp-filters">
+              <div className="seg" role="group" aria-label="צד">
+                {[['all', 'הכול'], ['tech', SIDES.tech.he], ['business', SIDES.business.he], ['both', SIDES.both.he]].map(([k, l]) => (
                   <button key={k} className={side === k ? 'on confirmed' : ''} onClick={() => setSide(k)}>{l}</button>
                 ))}
               </div>
@@ -254,14 +380,10 @@ export default function ParticipantApp({ token }) {
                 <option value="">כל התחומים</option>
                 {industries.map((x) => <option key={x} value={x}>{x}</option>)}
               </select>
-              {pitchedSet.size > 0 && (
-                <button className={`btn btn-sm ${pitchedOnly ? 'btn-mag' : ''}`} onClick={() => setPitchedOnly((v) => !v)}>רק מי שהציג/ה</button>
-              )}
             </div>
             <div className="small muted"><M>{shown.length}</M> משתתפים</div>
             {shown.map((p) => (
-              <ProfileCard key={p.id} p={p} rank={list.indexOf(p.id) + 1 || 0} pitched={pitchedSet.has(p.id)}
-                canAdd={list.length < max} open={isOpen} onToggle={toggle} />
+              <ProfileCard key={p.id} p={p} rank={list.indexOf(p.id) + 1 || 0} canAdd={list.length < max} open={isOpen} onToggle={toggle} />
             ))}
           </div>
         )}
@@ -271,10 +393,24 @@ export default function ParticipantApp({ token }) {
         <footer className={`pp-save ${save.state}`} role="status">
           {save.state === 'saving' && 'שומר…'}
           {save.state === 'saved' && <>נשמר ✓ <M>{list.length}/{max}</M></>}
-          {save.state === 'idle' && <>בחרת <M>{list.length}/{max}</M></>}
+          {save.state === 'idle' && <>בחרת <M>{list.length}/{max}</M> · כל שינוי נשמר מיד</>}
           {save.state === 'error' && <>{save.msg || 'לא נשמר'} <button className="btn btn-sm" onClick={() => persist(list)}>נסו שוב</button></>}
         </footer>
       )}
-    </div>
+    </Shell>
   );
+}
+
+export default function ParticipantApp() {
+  const urlP = useMemo(() => new URLSearchParams(window.location.search).get('p') || '', []);
+  const [token, setToken] = useState(() => (looksLikeToken(urlP) ? urlP : store.get(TOKEN_KEY)));
+  const [hint, setHint] = useState(() => (urlP && !looksLikeToken(urlP) ? urlP : ''));
+
+  useEffect(() => { if (token) store.set(TOKEN_KEY, token); }, [token]);
+
+  const logout = useCallback(() => { store.del(TOKEN_KEY); setToken(null); setHint(''); }, []);
+  const invalid = useCallback(() => { store.del(TOKEN_KEY); setToken(null); }, []);
+
+  if (!token) return <Login prefillId={hint} onLoggedIn={setToken} />;
+  return <Portal token={token} onLogout={logout} onInvalid={invalid} />;
 }

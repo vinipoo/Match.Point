@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Kpi, M, SideTag, Alert, Empty } from '../components/ui';
 import { adminApi, participantLink, boardHash, countdown } from '../lib/cloud';
-import { roundTime, roundEnd } from '../engine/scheduler';
 import { inviteText, waLink, copyText } from '../lib/io';
+import LivePublishBar from '../components/LivePublishBar';
 
-const PUBLIC_FIELDS = ['id', 'name', 'side', 'industry', 'idea', 'brings'];
-const toPublic = (p) => Object.fromEntries(PUBLIC_FIELDS.map((k) => [k, p[k] ?? (k === 'industry' ? [] : '')]));
+import { toPublicProfile } from '../lib/profile';
+const toPublic = (p) => ({ ...toPublicProfile(p), last4: String(p.phone || '').replace(/\D/g, '').slice(-4) });
 const PHASE_LABEL = { setup: 'לפני ההפסקה', open: 'הגשה פתוחה', closed: 'הגשה סגורה', published: 'הלו״ז פורסם' };
 const fmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—');
 
 export default function LiveTab(props) {
-  const { participants, setParticipants, byId, settings, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore } = props;
+  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, pitchedIds, togglePitch, pitchSync, publishLive, openQr } = props;
   const [keyInput, setKeyInput] = useState(cloud.key || '');
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState('');
@@ -88,7 +88,7 @@ export default function LiveTab(props) {
     subs.forEach((s) => s.list.forEach((id) => { if (s.id < id && subMap[id]?.includes(s.id)) n++; }));
     return n;
   }, [subs, subMap]);
-  const pitched = status?.pitched || [];
+  const pitched = pitchedIds;
   const closesAt = status?.event?.closesAt ? Date.parse(status.event.closesAt) : null;
   const left = closesAt ? closesAt - (now + offset.current) : 0;
   const localHash = boardHash(meetings);
@@ -113,22 +113,6 @@ export default function LiveTab(props) {
     return n;
   };
 
-  // ref keeps rapid consecutive taps from overwriting each other
-  const pitchedRef = useRef(pitched);
-  pitchedRef.current = pitched;
-  const togglePitched = (id) => {
-    const cur = pitchedRef.current;
-    const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-    pitchedRef.current = next;
-    setStatus((s) => ({ ...s, pitched: next }));
-    act('pitched', () => api.setPitched(next));
-  };
-
-  const publishSchedule = () => act('schedule', () => api.publishSchedule({
-    meetings: meetings.map(({ round, table, a, b }) => ({ round, table, a, b })),
-    times: Array.from({ length: settings.rounds }, (_, i) => ({ round: i + 1, start: roundTime(settings, i + 1), end: roundEnd(settings, i + 1) })),
-    hash: localHash,
-  }), 'הלו״ז פורסם – המשתתפים רואים אותו עכשיו בטלפון');
 
   const copy = async (text, msg = 'הועתק ✓') => notify((await copyText(text)) ? msg : 'ההעתקה נכשלה', 'ok');
 
@@ -195,12 +179,13 @@ export default function LiveTab(props) {
           </Card>
 
           <Card num="2" title="מי הציג Pitch" en={`Pitched · ${pitched.length}`}>
-            <p className="small muted" style={{ margin: '0 0 8px' }}>לחצו על שם בזמן הפיצ׳ים – הפרופילים יקבלו תג ״הציג/ה Pitch״ ויופיעו ראשונים אצל המשתתפים, לפי סדר ההצגה.</p>
+            <p className="small muted" style={{ margin: '0 0 8px' }}>לחצו על שם בזמן הפיצ׳ים (או על 🎤 בטאב 02) – הפרופילים יקבלו תג ״הציג/ה Pitch״ ויופיעו ראשונים אצל המשתתפים, לפי סדר ההצגה.
+              {pitchSync && <> · <span className={pitchSync.ok ? '' : 'tag tag-mag'}>{pitchSync.ok ? `סונכרן ${fmt(pitchSync.at)}` : `לא סונכרן: ${pitchSync.error}`}</span></>}</p>
             <div className="chips">
               {roster.filter((p) => rosterIds.has(p.id)).map((p) => {
                 const i = pitched.indexOf(p.id);
                 return (
-                  <button key={p.id} className={`tag ${i >= 0 ? 'tag-mag' : ''}`} style={{ cursor: 'pointer', padding: '3px 8px' }} onClick={() => togglePitched(p.id)}>
+                  <button key={p.id} className={`tag ${i >= 0 ? 'tag-mag' : ''}`} style={{ cursor: 'pointer', padding: '3px 8px' }} onClick={() => togglePitch(p.id)}>
                     {i >= 0 && <M>{i + 1}.</M>} {p.name}
                   </button>
                 );
@@ -274,12 +259,8 @@ export default function LiveTab(props) {
           </Card>
 
           <Card num="5" title="פרסום הלו״ז למשתתפים" en="Publish">
-            <div className="row">
-              <button className="btn btn-mag btn-lg" disabled={!meetings.length || !!busy} onClick={publishSchedule}>
-                {published ? 'פרסם שוב' : 'פרסם לו״ז'} (<M>{meetings.length}</M> פגישות)
-              </button>
-              {published && <span className="small">פורסם {fmt(published.publishedAt)} · <M>{published.count}</M> פגישות</span>}
-            </div>
+            <LivePublishBar publishLive={async () => { const ok = await publishLive(); refresh(); return ok; }} openQr={openQr} boardDirty={boardChanged} cloud={cloud} meetings={meetings} />
+            {published && <p className="small" style={{ margin: '8px 0 0' }}>בענן: פורסם {fmt(published.publishedAt)} · <M>{published.count}</M> פגישות</p>}
             {boardChanged && <div style={{ marginTop: 10 }}><Alert tone="warn" icon="!" title="הלוח השתנה מאז הפרסום – לחצו ״פרסם שוב״ כדי שהמשתתפים יראו את הגרסה העדכנית." /></div>}
             {!meetings.length && <p className="small muted" style={{ margin: '10px 0 0' }}>עדיין אין לוח שיבוץ.</p>}
           </Card>
