@@ -62,6 +62,7 @@ export const publicProfile = (p) => ({
   name: String(p.name || ''),
   side: p.side,
   industry: Array.isArray(p.industry) ? p.industry.map(String) : [],
+  industryOther: Array.isArray(p.industryOther) ? p.industryOther.map((x) => String(x).slice(0, 80)).slice(0, 3) : [],
   idea: String(p.idea || ''),
   brings: String(p.brings || ''),
   seeking: String(p.seeking || ''),

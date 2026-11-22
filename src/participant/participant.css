@@ -65,3 +65,23 @@
 .pp-wait-icon { font-size: 40px; animation: pp-spin 2.4s linear infinite; }
 @keyframes pp-spin { 50% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pp-wait-icon { animation: none; } }
+
+/* ---------- mobile hardening: never scroll sideways, always wrap ---------- */
+html:has(.pp), body:has(.pp) { overflow-x: hidden; max-width: 100%; }
+.pp { overflow-x: hidden; max-width: 100vw; }
+.pp *, .pp *::before, .pp *::after { min-width: 0; }
+.pp-main, .pp-card, .pp-stack, .pp-slot-body, .pp-rank-body, .pp-summary, .pp-seeking, .pp-text { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-word; }
+.pp-card { overflow: hidden; }
+.pp .chips, .pp-card-top, .pp-filters, .pp-me, .pp-slot-time, .pp-name { flex-wrap: wrap; min-width: 0; }
+.pp .tag { white-space: normal; overflow-wrap: anywhere; max-width: 100%; line-height: 1.35; padding-block: 1px; }
+.pp .seg { flex-wrap: wrap; max-width: 100%; }
+.pp .seg button { flex: 1 1 auto; }
+.pp .btn { white-space: normal; text-align: center; max-width: 100%; }
+.pp button, .pp .btn { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.pp-pick { width: 100%; }
+.pp-pick:disabled { opacity: .6; font-size: 13.5px; }
+.pp-nav { flex-wrap: nowrap; }
+.pp-nav button { min-width: 0; overflow-wrap: anywhere; }
+.pp-save { flex-wrap: wrap; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.pp { padding-bottom: 90px; }
+.pp-rank-acts { flex-shrink: 0; }

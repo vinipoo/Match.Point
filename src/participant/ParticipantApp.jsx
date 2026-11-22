@@ -122,7 +122,7 @@ function Login({ prefillId, onLoggedIn }) {
 }
 
 // ───────────── profile card ─────────────
-function ProfileCard({ p, rank, canAdd, open, onToggle }) {
+function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
   const [more, setMore] = useState(false);
   return (
     <article className={`pp-card ${rank ? 'chosen' : ''}`}>
@@ -144,12 +144,23 @@ function ProfileCard({ p, rank, canAdd, open, onToggle }) {
           <span className="pp-idea"><b>המיזם: </b>{p.idea}</span>
         </button>
       )}
-      {p.industry?.length > 0 && <div className="chips">{p.industry.map((x) => <span key={x} className="tag">{x}</span>)}</div>}
-      {open && (
-        <button type="button" className={`btn pp-pick ${rank ? 'btn-lime' : ''}`} disabled={!rank && !canAdd} onClick={() => onToggle(p.id)}>
-          {rank ? <>✓ בחירה מס׳ <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : 'הגעת למקסימום בחירות'}
-        </button>
+      {p.industry?.length > 0 && (
+        <div className="chips">
+          {p.industry.map((x) => <span key={x} className="tag">{x === 'אחר' && p.industryOther?.length ? `אחר: ${p.industryOther.join(', ')}` : x}</span>)}
+        </div>
       )}
+      {/* always rendered, so it's clear why it can't be pressed yet */}
+      <button
+        type="button"
+        className={`btn pp-pick ${rank ? 'btn-lime' : ''}`}
+        disabled={!open || (!rank && !canAdd)}
+        aria-pressed={!!rank}
+        onClick={() => onToggle(p.id)}
+      >
+        {!open
+          ? (rank ? <>✓ בחירה מס׳ <M>{rank}</M></> : 'הבחירה תיפתח כשהצוות יפתח את הדירוג')
+          : rank ? <>✓ בחירה מס׳ <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : `בחרת כבר ${max} – הסירו מישהו כדי להוסיף`}
+      </button>
     </article>
   );
 }
@@ -223,7 +234,7 @@ function Portal({ token, onLogout, onInvalid }) {
   const isLive = phase === 'published';
   const max = data?.event.maxChoices || 5;
 
-  const persist = useCallback((next) => {
+  const persist = useCallback((next, immediate = false) => {
     dirty.current = true;
     setSave({ state: 'saving' });
     clearTimeout(saveTimer.current);
@@ -236,7 +247,7 @@ function Portal({ token, onLogout, onInvalid }) {
         setSave({ state: 'error', msg: e.message });
         if (e.status === 409) { dirty.current = false; load(); }
       }
-    }, 450);
+    }, immediate ? 0 : 450);
   }, [token, load]);
 
   const update = (next) => { setList(next); persist(next); };
@@ -252,7 +263,11 @@ function Portal({ token, onLogout, onInvalid }) {
   const pitchedSet = useMemo(() => new Set(data?.pitched || []), [data]);
   const roster = useMemo(() => (data?.roster || []).map((p) => ({ ...p, pitched: pitchedSet.has(p.id) })), [data, pitchedSet]);
   const byId = useMemo(() => Object.fromEntries(roster.map((p) => [p.id, p])), [roster]);
-  const industries = useMemo(() => [...new Set(roster.flatMap((p) => p.industry || []))].sort(), [roster]);
+  // fixed domain list; every free-text "other" value is already grouped under a single "אחר"
+  const industries = useMemo(() => {
+    const all = [...new Set(roster.flatMap((p) => p.industry || []))];
+    return all.filter((x) => x !== 'אחר').sort().concat(all.includes('אחר') ? ['אחר'] : []);
+  }, [roster]);
   const me = data?.me;
   const looksForMe = useCallback(
     (p) => !me || me.side === 'both' || ['any', 'both', me.side].includes(p.seeksSide || 'any'),
@@ -408,7 +423,7 @@ function Portal({ token, onLogout, onInvalid }) {
             </div>
             <div className="small muted"><M>{shown.length}</M> משתתפים</div>
             {shown.map((p) => (
-              <ProfileCard key={p.id} p={p} rank={list.indexOf(p.id) + 1 || 0} canAdd={list.length < max} open={isOpen} onToggle={toggle} />
+              <ProfileCard key={p.id} p={p} rank={list.indexOf(p.id) + 1 || 0} canAdd={list.length < max} open={isOpen} onToggle={toggle} max={max} />
             ))}
           </div>
         )}
@@ -417,11 +432,18 @@ function Portal({ token, onLogout, onInvalid }) {
       )}
 
       {(isOpen || save.state === 'error') && (
-        <footer className={`pp-save ${save.state}`} role="status">
-          {save.state === 'saving' && 'שומר…'}
-          {save.state === 'saved' && <>נשמר ✓ <M>{list.length}/{max}</M></>}
-          {save.state === 'idle' && <>בחרת <M>{list.length}/{max}</M> · כל שינוי נשמר מיד</>}
-          {save.state === 'error' && <>{save.msg || 'לא נשמר'} <button className="btn btn-sm" onClick={() => persist(list)}>נסו שוב</button></>}
+        <footer className={`pp-save ${save.state}`}>
+          <span role="status" aria-live="polite">
+            {save.state === 'saving' && 'שומר…'}
+            {save.state === 'saved' && <>נשמר ✓ <M>{list.length}/{max}</M></>}
+            {save.state === 'idle' && <>בחרת <M>{list.length}/{max}</M></>}
+            {save.state === 'error' && (save.msg || 'לא נשמר')}
+          </span>
+          {isOpen && (
+            <button className="btn btn-sm btn-lime" onClick={() => persist(list, true)} disabled={save.state === 'saving'}>
+              {save.state === 'error' ? 'נסו שוב' : 'שמור בחירות'}
+            </button>
+          )}
         </footer>
       )}
     </Shell>
