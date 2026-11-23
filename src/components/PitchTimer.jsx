@@ -9,35 +9,65 @@ const PRESETS = [45, 60, 90, 120, 180];
 const DEFAULT_SECONDS = 45;
 const durLabel = (s) => (s < 60 ? `${s} שנ׳` : `${s / 60} דק׳`);
 
-// Bell: three rings synthesised with Web Audio (no audio file, works offline)
-let audioCtx = null;
+// Bell: three loud rings rendered to a WAV in the browser and played through an <audio> element.
+// (An audio element also plays when an iPhone is on silent, unlike Web Audio; no file to download.)
+function renderBellWav() {
+  const sr = 44100;
+  const n = Math.floor(sr * 2.4);
+  const data = new Float32Array(n);
+  const partials = [[880, 1], [1320, 0.5], [1760, 0.28], [2640, 0.14], [3520, 0.06]];
+  for (const r0 of [0, 0.6, 1.2]) {
+    const start = Math.floor(r0 * sr);
+    for (let i = 0; start + i < n; i++) {
+      const t = i / sr;
+      const env = Math.min(1, t / 0.005) * Math.exp(-t * 2.6);
+      let v = 0;
+      for (const [freq, amp] of partials) v += amp * Math.sin(2 * Math.PI * freq * t);
+      data[start + i] += v * env;
+    }
+  }
+  let peak = 0;
+  for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(data[i]));
+  const buf = new ArrayBuffer(44 + n * 2);
+  const dv = new DataView(buf);
+  const str = (o, x) => { for (let i = 0; i < x.length; i++) dv.setUint8(o + i, x.charCodeAt(i)); };
+  str(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
+  dv.setUint32(24, sr, true); dv.setUint32(28, sr * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
+  str(36, 'data'); dv.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, (data[i] / peak) * 0.95)) * 32767, true);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+let bellEl = null;
+const getBell = () => {
+  if (!bellEl) {
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* not supported */ }
+    bellEl = new Audio(renderBellWav());
+    bellEl.preload = 'auto';
+    bellEl.volume = 1;
+  }
+  return bellEl;
+};
+// browsers only allow sound after a user gesture: call this from a click (start / test)
 const getAudio = () => {
   try {
-    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return audioCtx;
+    const el = getBell();
+    if (el.dataset.unlocked) return el;
+    el.muted = true;
+    el.play().then(() => { el.pause(); el.currentTime = 0; el.muted = false; el.dataset.unlocked = '1'; }).catch(() => { el.muted = false; });
+    return el;
   } catch { return null; }
 };
 function ringBell() {
-  const ctx = getAudio();
-  if (!ctx) return;
-  const now = ctx.currentTime;
-  for (let k = 0; k < 3; k++) {
-    const t = now + k * 0.55;
-    [[880, 0.38], [1320, 0.18], [1760, 0.1], [2640, 0.05]].forEach(([freq, vol]) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t);
-      osc.stop(t + 1.45);
-    });
-  }
+  try {
+    const el = getBell();
+    el.muted = false;
+    el.currentTime = 0;
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch { /* no audio available */ }
 }
+
 const fmt = (ms) => {
   const neg = ms < 0;
   const s = Math.ceil(Math.abs(ms) / 1000);
