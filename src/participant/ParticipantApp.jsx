@@ -351,7 +351,7 @@ function Portal({ token, onLogout, onInvalid }) {
                 </div>
                 <div className="pp-slot-body">
                   <div className="pp-slot-time">
-                    סבב <M>{pad(s.round)}</M>
+                    סבב <M>{pad(s.round)}</M> · <M>{s.start}–{s.end}</M>
                     {s.round === currentRound && <span className="tag tag-mag">עכשיו</span>}
                   </div>
                   {s.partner ? (
