@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { EVENT, SIDES } from '../lib/constants';
+import { EVENT } from '../lib/constants';
 import { participantApi, countdown } from '../lib/cloud';
 import { M, SideTag } from '../components/ui';
 import './participant.css';
@@ -173,7 +173,6 @@ function Portal({ token, onLogout, onInvalid }) {
   const [save, setSave] = useState({ state: 'idle' });
   const [view, setView] = useState('browse');
   const [q, setQ] = useState('');
-  const [side, setSide] = useState('all');
   const [industry, setIndustry] = useState('');
   const [pitchOnly, setPitchOnly] = useState(false);
   const [forMe, setForMe] = useState(false);
@@ -282,13 +281,12 @@ function Portal({ token, onLogout, onInvalid }) {
     const order = new Map((data.pitched || []).map((id, i) => [id, i]));
     return roster
       .filter((p) => p.id !== data.me.id)
-      .filter((p) => side === 'all' || p.side === side)
       .filter((p) => !industry || (p.industry || []).includes(industry))
       .filter((p) => !pitchOnly || p.pitched)
       .filter((p) => !forMe || looksForMe(p))
       .filter((p) => !t || [p.name, p.id, p.idea, p.brings, p.seeking, ...(p.industry || [])].join(' ').toLowerCase().includes(t))
       .sort((a, b) => (order.has(a.id) ? order.get(a.id) : 1e6) - (order.has(b.id) ? order.get(b.id) : 1e6) || a.id.localeCompare(b.id, 'en', { numeric: true }));
-  }, [data, roster, q, side, industry, pitchOnly, forMe, looksForMe]);
+  }, [data, roster, q, industry, pitchOnly, forMe, looksForMe]);
 
   const refresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
@@ -414,11 +412,6 @@ function Portal({ token, onLogout, onInvalid }) {
               </div>
             </div>
             <div className="pp-filters">
-              <div className="seg" role="group" aria-label="צד">
-                {[['all', 'הכול'], ['tech', SIDES.tech.he], ['business', SIDES.business.he], ['both', SIDES.both.he]].map(([k, l]) => (
-                  <button key={k} className={side === k ? 'on confirmed' : ''} onClick={() => setSide(k)}>{l}</button>
-                ))}
-              </div>
               <select className="select" value={industry} onChange={(e) => setIndustry(e.target.value)} aria-label="תחום">
                 <option value="">כל התחומים</option>
                 {industries.map((x) => <option key={x} value={x}>{x}</option>)}
