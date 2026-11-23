@@ -5,13 +5,50 @@ import { M } from './ui';
 // Full-screen pitch timer for the venue screen. Staff control everything from this screen:
 // start / pause / reset / ±15s / duration, next / previous / skip, jump to anyone, reorder the queue.
 const STORE = 'mp-pitch-timer';
-const PRESETS = [60, 90, 120, 180];
+const PRESETS = [45, 60, 90, 120, 180];
+const DEFAULT_SECONDS = 45;
+const durLabel = (s) => (s < 60 ? `${s} שנ׳` : `${s / 60} דק׳`);
+
+// Bell: three rings synthesised with Web Audio (no audio file, works offline)
+let audioCtx = null;
+const getAudio = () => {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  } catch { return null; }
+};
+function ringBell() {
+  const ctx = getAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  for (let k = 0; k < 3; k++) {
+    const t = now + k * 0.55;
+    [[880, 0.38], [1320, 0.18], [1760, 0.1], [2640, 0.05]].forEach(([freq, vol]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 1.45);
+    });
+  }
+}
 const fmt = (ms) => {
   const neg = ms < 0;
   const s = Math.ceil(Math.abs(ms) / 1000);
   return `${neg ? '+' : ''}${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
-const load = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
+const load = () => {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE)) || {};
+    return s.v === 2 ? s : { ...s, v: 2, duration: DEFAULT_SECONDS };
+  } catch { return {}; }
+};
 
 export default function PitchTimer({ participants, pitchedIds, onClose }) {
   const byId = useMemo(() => Object.fromEntries(participants.map((p) => [p.id, p])), [participants]);
@@ -26,10 +63,11 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
   const [skipped, setSkipped] = useState(() => (saved.skipped || []).filter((id) => byId[id]));
   const [done, setDone] = useState(() => (saved.done || []).filter((id) => byId[id]));
   const [idx, setIdx] = useState(() => Math.min(saved.idx || 0, Math.max(0, (saved.queue || []).length - 1)));
-  const [duration, setDuration] = useState(saved.duration || 90);
+  const [duration, setDuration] = useState(saved.duration || DEFAULT_SECONDS);
+  const [sound, setSound] = useState(saved.sound !== false);
   const [autoNext, setAutoNext] = useState(!!saved.autoNext);
   const [showIdea, setShowIdea] = useState(saved.showIdea !== false);
-  const [remaining, setRemaining] = useState((saved.duration || 90) * 1000);
+  const [remaining, setRemaining] = useState((saved.duration || DEFAULT_SECONDS) * 1000);
   const [running, setRunning] = useState(false);
   const [controls, setControls] = useState(true);
   const [custom, setCustom] = useState('');
@@ -44,8 +82,8 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
   }, [arrived, byId, skipped, done]);
 
   useEffect(() => {
-    try { localStorage.setItem(STORE, JSON.stringify({ queue, skipped, done, idx, duration, autoNext, showIdea })); } catch { /* ignore */ }
-  }, [queue, skipped, done, idx, duration, autoNext, showIdea]);
+    try { localStorage.setItem(STORE, JSON.stringify({ v: 2, queue, skipped, done, idx, duration, autoNext, showIdea, sound })); } catch { /* ignore */ }
+  }, [queue, skipped, done, idx, duration, autoNext, showIdea, sound]);
 
   const current = byId[queue[idx]] || null;
   const nextUp = byId[queue[idx + 1]] || null;
@@ -56,7 +94,7 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
     const h = setInterval(() => setRemaining(endAt.current - Date.now()), 100);
     return () => clearInterval(h);
   }, [running]);
-  const start = useCallback(() => { endAt.current = Date.now() + remaining; setRunning(true); }, [remaining]);
+  const start = useCallback(() => { if (sound) getAudio(); endAt.current = Date.now() + remaining; setRunning(true); }, [remaining, sound]);
   const pause = useCallback(() => { setRunning(false); setRemaining(endAt.current - Date.now()); }, []);
   const toggle = useCallback(() => (running ? pause() : start()), [running, pause, start]);
   const reset = useCallback((secs = duration) => { setRunning(false); setRemaining(secs * 1000); }, [duration]);
@@ -95,6 +133,14 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
 
   // auto-advance when time is up
   const over = remaining <= 0;
+  const rang = useRef(false);
+  useEffect(() => {
+    if (!over) { rang.current = false; return; }
+    if (running && !rang.current) {
+      rang.current = true;
+      if (sound) ringBell();
+    }
+  }, [over, running, sound]);
   useEffect(() => {
     if (running && over && autoNext && idx < queue.length - 1) next();
   }, [running, over, autoNext, idx, queue.length, next]);
@@ -177,7 +223,7 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
             <div className="pt-group" role="group" aria-label="משך">
               <select className="select pt-select" value={PRESETS.includes(duration) ? duration : 'custom'} aria-label="משך כל פיץ׳"
                 onChange={(e) => { if (e.target.value !== 'custom') setDur(Number(e.target.value)); else setCustom(String(duration)); }}>
-                {PRESETS.map((s) => <option key={s} value={s}>{s / 60} דק׳</option>)}
+                {PRESETS.map((s) => <option key={s} value={s}>{durLabel(s)}</option>)}
                 <option value="custom">{PRESETS.includes(duration) ? 'אחר…' : `${duration} שנ׳`}</option>
               </select>
               {(custom !== '' || !PRESETS.includes(duration)) && (
@@ -196,6 +242,8 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
                 {menuOpen && (
                   <div className="pt-menu" role="menu">
                     <label className="pt-check"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} /> מעבר אוטומטי כשהזמן נגמר</label>
+                    <label className="pt-check"><input type="checkbox" checked={sound} onChange={(e) => setSound(e.target.checked)} /> 🔔 צלצול בסוף הזמן</label>
+                    {sound && <button className="btn btn-sm" onClick={ringBell}>▶ השמע צלצול לבדיקה</button>}
                     <label className="pt-check"><input type="checkbox" checked={showIdea} onChange={(e) => setShowIdea(e.target.checked)} /> הצג את המיזם</label>
                     <button className="btn btn-sm" onClick={() => { fullscreen(); setMenuOpen(false); }}>⛶ מסך מלא <M>F</M></button>
                     <button className="btn btn-sm" onClick={() => { setControls(false); setMenuOpen(false); }}>הסתר שליטה <M>H</M></button>
