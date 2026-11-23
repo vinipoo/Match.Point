@@ -126,8 +126,14 @@ function Login({ prefillId, onLoggedIn }) {
 // ───────────── profile card ─────────────
 function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
   const [more, setMore] = useState(false);
+  // the whole card picks / un-picks while voting is open (inner buttons keep their own action)
+  const clickable = open && (rank || canAdd);
+  const onCardClick = (e) => {
+    if (!clickable || e.target.closest('button, a, input, select, textarea')) return;
+    onToggle(p.id);
+  };
   return (
-    <article className={`pp-card ${rank ? 'chosen' : ''}`}>
+    <article className={`pp-card ${rank ? 'chosen' : ''} ${clickable ? 'clickable' : ''}`} onClick={onCardClick}>
       <div className="pp-card-top">
         <div className="pp-name">{p.name}</div>
         <SideTag side={p.side} />

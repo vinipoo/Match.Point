@@ -88,3 +88,8 @@ html:has(.pp), body:has(.pp) { overflow-x: hidden; max-width: 100%; }
 
 .pp-pitch { font-weight: 700; }
 .pp-pitch .mono { color: #fff; }
+
+/* whole profile card is tappable while voting is open */
+.pp-card.clickable { cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .06s, box-shadow .06s; }
+.pp-card.clickable:active { transform: scale(.99); }
+@media (hover: hover) { .pp-card.clickable:hover { box-shadow: -3px 3px 0 var(--line); } .pp-card.clickable.chosen:hover { box-shadow: -4px 4px 0 var(--lime); } }
