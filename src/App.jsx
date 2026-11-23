@@ -4,6 +4,7 @@ import { computeScores, pairKey } from './engine/scoring';
 import { schedule, scheduleStats, analyzeGaps, activeIds, roundTime, roundEnd, members } from './engine/scheduler';
 import { adminApi, boardHash } from './lib/cloud';
 import QrModal from './components/QrModal';
+import PitchTimer from './components/PitchTimer';
 import { M } from './components/ui';
 import SetupTab from './tabs/SetupTab';
 import ParticipantsTab from './tabs/ParticipantsTab';
@@ -199,6 +200,8 @@ export default function App() {
     return () => clearTimeout(h);
   }, [participants, meetings, settings, constraints, weights, cloud.key, snapshot]);
 
+  const [timerOpen, setTimerOpen] = useState(false);
+  const openTimer = useCallback(() => setTimerOpen(true), []);
   const [qrOpen, setQrOpen] = useState(false);
   const openQr = useCallback(() => setQrOpen(true), []);
   const boardDirty = !!cloud.publishedHash && cloud.publishedHash !== boardHash(visibleMeetings);
@@ -208,7 +211,7 @@ export default function App() {
     constraints, setConstraints, addConstraint, removeConstraint,
     meetings: visibleMeetings, setMeetings, scores, active, gaps, stats, broken, lastRun, run, notify, setTab,
     cloud, setCloud, snapshot, restore,
-    pitchedIds, togglePitch, pitchSync, publishLive, openQr, boardDirty,
+    pitchedIds, togglePitch, pitchSync, publishLive, openQr, boardDirty, openTimer,
   };
 
   const checkedIn = participants.filter((p) => p.status === 'checked_in').length;
@@ -266,6 +269,7 @@ export default function App() {
       </main>
 
       {qrOpen && <QrModal onClose={() => setQrOpen(false)} />}
+      {timerOpen && <PitchTimer participants={participants} pitchedIds={pitchedIds} onClose={() => setTimerOpen(false)} />}
       {toast && <div className={`toast ${toast.kind === 'err' ? 'err' : ''}`} role="status">{toast.msg}</div>}
     </>
   );

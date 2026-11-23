@@ -9,7 +9,7 @@ const blank = (id) => ({
 });
 
 export default function ParticipantsTab(props) {
-  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify, togglePitch, pitchedIds, cloud, pitchSync } = props;
+  const { participants, setParticipants, setMeetings, setConstraints, settings, setSettings, stats, active, gaps, broken, run, setTab, notify, togglePitch, pitchedIds, cloud, pitchSync, openTimer } = props;
   const [q, setQ] = useState('');
   const [side, setSide] = useState('all');
   const [status, setStatus] = useState('all');
@@ -74,7 +74,8 @@ export default function ParticipantsTab(props) {
   return (
     <div className="stack">
       <div className="grid-2">
-        <Card num="02.A" title="מצב הגעה" en="Check-in Live">
+        <Card num="02.A" title="מצב הגעה" en="Check-in Live"
+          actions={<button className="btn btn-lime btn-sm" onClick={openTimer}>⏱ מסך טיימר פיצ׳ים</button>}>
           <div className="kpis">
             <Kpi value={counts.checked_in} sub={`/${participants.length}`} label="הגיעו בפועל" />
             <Kpi value={counts.confirmed} label="מאושרים (טרם הגיעו)" tone="ghost" size="sm" />

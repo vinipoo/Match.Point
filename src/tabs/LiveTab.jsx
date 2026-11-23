@@ -10,7 +10,7 @@ const PHASE_LABEL = { setup: 'טרום אירוע', open: 'דירוג פתוח �
 const fmt = (iso) => (iso ? new Date(iso).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) : '—');
 
 export default function LiveTab(props) {
-  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, publishLive, openQr, pitchedIds } = props;
+  const { participants, setParticipants, byId, meetings, cloud, setCloud, notify, setTab, run, snapshot, restore, publishLive, openQr, pitchedIds, openTimer } = props;
   const [keyInput, setKeyInput] = useState(cloud.key || '');
   const [status, setStatus] = useState(null);
   const [err, setErr] = useState('');
@@ -179,7 +179,8 @@ export default function LiveTab(props) {
           </Card>
 
 
-          <Card num="3" title="מצב האירוע – שליטה ידנית של הצוות" en={PHASE_LABEL[phase]}>
+          <Card num="3" title="מצב האירוע – שליטה ידנית של הצוות" en={PHASE_LABEL[phase]}
+            actions={<button className="btn btn-lime btn-sm" onClick={openTimer}>⏱ מסך טיימר פיצ׳ים</button>}>
             <div className="stack" style={{ gap: 14 }}>
               <div className="phase-switch" role="group" aria-label="מצב האירוע">
                 <button className={`phase-btn voting ${phase === 'open' ? 'on' : ''}`} disabled={!rosterIds.size || !!busy}
