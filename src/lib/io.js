@@ -213,7 +213,43 @@ export function mapRows(rows) {
       prefs,
     };
   });
-  return { participants, constraints: { must: [...must.values()], exclude: [...exclude.values()] }, warnings };
+  // Someone who submitted the form twice must appear once: same phone or same email = same person.
+  // The later submission (lower in the file) wins; references to the dropped ID are redirected.
+  const keyOf = (p) => {
+    const d = String(p.phone || '').replace(/\D/g, '');
+    return [d.length >= 7 ? `t:${d.slice(-9)}` : null, p.email ? `e:${p.email.trim().toLowerCase()}` : null].filter(Boolean);
+  };
+  const owner = new Map();
+  const replacedBy = {};
+  participants.forEach((p, i) => {
+    for (const k of keyOf(p)) {
+      if (owner.has(k) && owner.get(k) !== i) replacedBy[owner.get(k)] = i;
+      owner.set(k, i);
+    }
+  });
+  const finalIndex = (i) => (replacedBy[i] === undefined ? i : finalIndex(replacedBy[i]));
+  const idMap = {};
+  participants.forEach((p, i) => { idMap[p.id] = participants[finalIndex(i)].id; });
+  const unique = participants.filter((p, i) => finalIndex(i) === i);
+  const merged = participants.length - unique.length;
+  if (merged) {
+    participants.forEach((p, i) => {
+      if (finalIndex(i) !== i) warnings.push(`${p.name}: נרשם/ה יותר מפעם אחת – נשמרה ההרשמה האחרונה`);
+    });
+    const remap = (id) => idMap[id] || id;
+    unique.forEach((p) => {
+      const seenPref = new Set();
+      p.prefs = p.prefs.map((x) => ({ ...x, id: remap(x.id) })).filter((x) => x.id !== p.id && !seenPref.has(x.id) && seenPref.add(x.id));
+    });
+    for (const store of [must, exclude]) {
+      for (const [k, [a, b]] of [...store.entries()]) {
+        store.delete(k);
+        const [x, y] = [remap(a), remap(b)];
+        if (x !== y) store.set(pairKey(x, y), [x, y]);
+      }
+    }
+  }
+  return { participants: unique, constraints: { must: [...must.values()], exclude: [...exclude.values()] }, warnings, merged };
 }
 
 // ---------- helpers ----------

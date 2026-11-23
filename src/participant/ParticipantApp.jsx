@@ -27,7 +27,7 @@ function Shell({ children, me, onLogout }) {
         </div>
         {me && (
           <div className="pp-me">
-            <span>שלום, <b>{me.name}</b></span> <M className="pp-id inv">{me.id}</M> <SideTag side={me.side} />
+            <span>שלום, <b>{me.name}</b></span> <SideTag side={me.side} />
             <button className="pp-link" onClick={onLogout}>לא את/ה?</button>
           </div>
         )}
@@ -93,7 +93,7 @@ function Login({ prefillId, onLoggedIn }) {
                   <div className="pp-stack" style={{ gap: 6 }}>
                     {matches.map((p) => (
                       <button type="button" key={p.id} className="pp-pickname" onClick={() => setSel(p)}>
-                        <span>{p.name}</span> <M className="pp-id">{p.id}</M>
+                        <span>{p.name}</span>
                       </button>
                     ))}
                     {q.trim() && matches.length === 0 && <div className="small muted">לא נמצא. נסו חלק מהשם, או פנו לצוות.</div>}
@@ -102,7 +102,7 @@ function Login({ prefillId, onLoggedIn }) {
               ) : (
                 <>
                   <div className="pp-pickname on">
-                    <span>{sel.name}</span> <M className="pp-id">{sel.id}</M>
+                    <span>{sel.name}</span>
                     <button type="button" className="pp-link" onClick={() => { setSel(null); setDigits(''); }}>שינוי</button>
                   </div>
                   <label className="field">
@@ -128,7 +128,6 @@ function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
   return (
     <article className={`pp-card ${rank ? 'chosen' : ''}`}>
       <div className="pp-card-top">
-        <M className="pp-id">{p.id}</M>
         <div className="pp-name">{p.name}</div>
         <SideTag side={p.side} />
         <PitchBadge n={p.pitchNo} />
@@ -406,7 +405,7 @@ function Portal({ token, onLogout, onInvalid }) {
 
         {!isLive && view === 'browse' && (
           <div className="pp-stack">
-            <input className="input" placeholder="חיפוש חופשי: שם, מזהה, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
+            <input className="input" placeholder="חיפוש חופשי: שם, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
             <div className="pp-filters">
               <button className={`btn btn-sm ${forMe ? 'btn-lime' : ''}`} aria-pressed={forMe} onClick={() => setForMe((v) => !v)}>🎯 הצג שותפים מהצד המשלים</button>
               <div className="seg" role="group" aria-label="Pitch">
