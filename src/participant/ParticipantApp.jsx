@@ -302,12 +302,6 @@ function Portal({ token, onLogout, onInvalid }) {
 
   return (
     <Shell me={data.me} onLogout={onLogout}>
-      {changed.length > 0 && (
-        <div className="pp-alert" role="alert">
-          <b>הלו״ז שלך עודכן!</b> שים/י לב לשינוי {changed.length > 1 ? 'בסבבים' : 'בסבב'} <M>{changed.join(', ')}</M>
-          <button className="pp-link" onClick={() => setChanged([])} aria-label="סגור התראה">✕</button>
-        </div>
-      )}
       {phase === 'setup' && <div className="pp-banner">בחירת האנשים תיפתח בהפסקה שאחרי הפיצ׳ים. בינתיים אפשר לעיין בפרופילים.</div>}
       {isOpen && (
         <div className="pp-banner live">
