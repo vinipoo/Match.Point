@@ -33,6 +33,8 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
   const [running, setRunning] = useState(false);
   const [controls, setControls] = useState(true);
   const [custom, setCustom] = useState('');
+  const [queueOpen, setQueueOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const endAt = useRef(null);
   const rootRef = useRef(null);
 
@@ -156,52 +158,77 @@ export default function PitchTimer({ participants, pitchedIds, onClose }) {
 
       {controls ? (
         <footer className="pt-controls">
-          <div className="pt-row">
-            <button className="btn" onClick={prev} disabled={idx === 0} title="הקודם (→)">⏮ הקודם</button>
-            <button className={`btn btn-lg ${running ? 'btn-mag' : 'btn-lime'}`} onClick={toggle} disabled={!current} title="רווח">{running ? '⏸ השהה' : '▶ התחל'}</button>
-            <button className="btn" onClick={() => reset()} title="R">↺ איפוס</button>
-            <button className="btn" onClick={() => addTime(-15000)} title="−">−15 שנ׳</button>
-            <button className="btn" onClick={() => addTime(15000)} title="+">+15 שנ׳</button>
-            <button className="btn" onClick={skip} disabled={!current} title="S">⤼ דלג</button>
-            <button className="btn btn-lime" onClick={next} disabled={!current} title="הבא (←)">הבא ⏭</button>
-          </div>
-          <div className="pt-row small">
-            <span>משך:</span>
-            {PRESETS.map((s) => (
-              <button key={s} className={`btn btn-sm ${duration === s ? 'btn-dark' : ''}`} onClick={() => setDur(s)}>{s % 60 ? `${s / 60} דק׳` : `${s / 60} דק׳`}</button>
-            ))}
-            <input className="input mono" style={{ width: 70 }} placeholder="שנ׳" value={custom} inputMode="numeric"
-              onChange={(e) => setCustom(e.target.value.replace(/\D/g, ''))}
-              onKeyDown={(e) => { if (e.key === 'Enter' && Number(custom) > 0) { setDur(Number(custom)); setCustom(''); } }} aria-label="משך מותאם בשניות" />
-            <label className="pt-check"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} /> מעבר אוטומטי לבא כשהזמן נגמר</label>
-            <label className="pt-check"><input type="checkbox" checked={showIdea} onChange={(e) => setShowIdea(e.target.checked)} /> הצג את המיזם</label>
-            <span className="pt-spacer" />
-            <button className="btn btn-sm" onClick={fullscreen} title="F">⛶ מסך מלא</button>
-            <button className="btn btn-sm" onClick={() => setControls(false)} title="H">הסתר שליטה</button>
-            <button className="btn btn-sm btn-danger" onClick={onClose}>סגור</button>
+          <div className="pt-bar-row">
+            <div className="pt-group" role="group" aria-label="מציגים">
+              <button className="btn btn-sm" onClick={prev} disabled={idx === 0} title="הקודם (→)">⏮</button>
+              <button className="btn btn-sm" onClick={skip} disabled={!current} title="דלג (S)">⤼ דלג</button>
+              <button className="btn btn-sm btn-lime" onClick={next} disabled={!current} title="הבא (←)">הבא ⏭</button>
+            </div>
+
+            <div className="pt-group pt-main" role="group" aria-label="טיימר">
+              <button className="btn btn-sm" onClick={() => reset()} title="איפוס (R)">↺</button>
+              <button className="btn btn-sm" onClick={() => addTime(-15000)} title="−15 שנ׳">−15</button>
+              <button className={`btn pt-play ${running ? 'btn-mag' : 'btn-lime'}`} onClick={toggle} disabled={!current} title="רווח">
+                {running ? '⏸ השהה' : '▶ התחל'}
+              </button>
+              <button className="btn btn-sm" onClick={() => addTime(15000)} title="+15 שנ׳">+15</button>
+            </div>
+
+            <div className="pt-group" role="group" aria-label="משך">
+              <select className="select pt-select" value={PRESETS.includes(duration) ? duration : 'custom'} aria-label="משך כל פיץ׳"
+                onChange={(e) => { if (e.target.value !== 'custom') setDur(Number(e.target.value)); else setCustom(String(duration)); }}>
+                {PRESETS.map((s) => <option key={s} value={s}>{s / 60} דק׳</option>)}
+                <option value="custom">{PRESETS.includes(duration) ? 'אחר…' : `${duration} שנ׳`}</option>
+              </select>
+              {(custom !== '' || !PRESETS.includes(duration)) && (
+                <input className="input mono pt-custom" placeholder="שנ׳" value={custom} inputMode="numeric" aria-label="משך מותאם בשניות"
+                  onChange={(e) => setCustom(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && Number(custom) > 0) { setDur(Number(custom)); setCustom(''); } }} />
+              )}
+            </div>
+
+            <div className="pt-group pt-tools">
+              <button className={`btn btn-sm ${queueOpen ? 'btn-dark' : ''}`} onClick={() => setQueueOpen((v) => !v)} aria-expanded={queueOpen}>
+                תור <M>{queue.length}</M>{skipped.length ? <M className="pt-badge">{skipped.length}</M> : null} {queueOpen ? '▴' : '▾'}
+              </button>
+              <div className="pt-menu-wrap">
+                <button className="btn btn-sm" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen} title="הגדרות">⚙</button>
+                {menuOpen && (
+                  <div className="pt-menu" role="menu">
+                    <label className="pt-check"><input type="checkbox" checked={autoNext} onChange={(e) => setAutoNext(e.target.checked)} /> מעבר אוטומטי כשהזמן נגמר</label>
+                    <label className="pt-check"><input type="checkbox" checked={showIdea} onChange={(e) => setShowIdea(e.target.checked)} /> הצג את המיזם</label>
+                    <button className="btn btn-sm" onClick={() => { fullscreen(); setMenuOpen(false); }}>⛶ מסך מלא <M>F</M></button>
+                    <button className="btn btn-sm" onClick={() => { setControls(false); setMenuOpen(false); }}>הסתר שליטה <M>H</M></button>
+                    {(done.length > 0 || skipped.length > 0) && <button className="btn btn-sm" onClick={() => { setMenuOpen(false); restartAll(); }}>↺ התחל סבב פיצ׳ים מחדש</button>}
+                    <div className="pt-keys small"><M>Space</M> התחל/השהה · <M>←/→</M> הבא/הקודם · <M>S</M> דלג · <M>R</M> איפוס · <M>+/−</M> 15 שנ׳</div>
+                  </div>
+                )}
+              </div>
+              <button className="btn btn-sm btn-danger" onClick={onClose} title="סגור (Esc)">✕</button>
+            </div>
           </div>
 
-          <div className="pt-queue">
-            {queue.map((id, i) => (
-              <div key={id} className={`pt-q ${i === idx ? 'on' : ''} ${done.includes(id) ? 'done' : ''}`}>
-                <button className="pt-q-name" onClick={() => goTo(i)} title="עבור למציג/ה">
-                  <M>{i + 1}.</M> {byId[id]?.name}{done.includes(id) ? ' ✓' : ''}
-                </button>
-                <button className="pt-q-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="הקדם">▲</button>
-                <button className="pt-q-btn" onClick={() => move(i, 1)} disabled={i === queue.length - 1} aria-label="אחר">▼</button>
-              </div>
-            ))}
-            {skipped.length > 0 && (
-              <div className="pt-skipped">
-                <span>דולגו:</span>
-                {skipped.map((id) => (
-                  <button key={id} className="btn btn-xs" onClick={() => restore(id)} title="החזר לתור אחרי הנוכחי">↩ {byId[id]?.name}</button>
-                ))}
-              </div>
-            )}
-            {(done.length > 0 || skipped.length > 0) && <button className="btn btn-xs btn-ghost" onClick={restartAll}>התחל מחדש</button>}
-          </div>
-          <div className="pt-keys small"><M>Space</M> התחל/השהה · <M>←/→</M> הבא/הקודם · <M>S</M> דלג · <M>R</M> איפוס · <M>+/−</M> 15 שנ׳ · <M>H</M> הסתר · <M>F</M> מסך מלא</div>
+          {queueOpen && (
+            <div className="pt-queue">
+              {queue.map((id, i) => (
+                <div key={id} className={`pt-q ${i === idx ? 'on' : ''} ${done.includes(id) ? 'done' : ''}`}>
+                  <button className="pt-q-name" onClick={() => goTo(i)} title="עבור למציג/ה">
+                    <M>{i + 1}.</M> {byId[id]?.name}{done.includes(id) ? ' ✓' : ''}
+                  </button>
+                  <button className="pt-q-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label="הקדם">▲</button>
+                  <button className="pt-q-btn" onClick={() => move(i, 1)} disabled={i === queue.length - 1} aria-label="אחר">▼</button>
+                </div>
+              ))}
+              {skipped.length > 0 && (
+                <div className="pt-skipped">
+                  <span>דולגו:</span>
+                  {skipped.map((id) => (
+                    <button key={id} className="btn btn-xs" onClick={() => restore(id)} title="החזר לתור אחרי הנוכחי">↩ {byId[id]?.name}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </footer>
       ) : (
         <button className="pt-show" onClick={() => setControls(true)} title="H">שליטה</button>

@@ -442,3 +442,26 @@ input[type='range'] { width: 100%; accent-color: var(--mag); }
 .pt-name { font-size: clamp(32px, min(8vw, 13vh), 120px); }
 .pt-clock { font-size: clamp(64px, min(16vw, 24vh), 240px); }
 .pt-label { font-size: clamp(16px, min(2.4vw, 4vh), 32px); }
+
+/* ---------- pitch timer: compact, grouped controls ---------- */
+.pt-name { font-size: clamp(28px, min(6.5vw, 11vh), 96px); }
+.pt-clock { font-size: clamp(56px, min(13vw, 20vh), 200px); }
+.pt-label { font-size: clamp(14px, min(2vw, 3.4vh), 26px); }
+.pt-idea { font-size: clamp(14px, 1.5vw, 20px); }
+.pt-bar { height: 10px; width: min(60vw, 760px); }
+.pt-stage { gap: 1.2vh; }
+.pt-controls { padding: 8px 2vw; gap: 8px; }
+.pt-bar-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
+.pt-group { display: inline-flex; gap: 4px; align-items: center; padding: 4px; border: 1px solid #3a3e42; }
+.pt-group .btn-sm { padding: 5px 10px; font-size: 13px; }
+.pt-main { border-color: #55595e; }
+.pt-play { min-width: 112px; justify-content: center; font-size: 15px; padding: 6px 14px; }
+.pt-select { width: auto; background: #2c3034; color: #fff; border-color: #55595e; padding: 4px 8px; font-size: 13px; }
+.pt-custom { width: 64px; padding: 4px 6px; font-size: 13px; }
+.pt-tools { border: 0; padding: 0; }
+.pt-badge { background: var(--mag); color: #fff; padding: 0 4px; margin-inline-start: 4px; font-size: 11px; }
+.pt-menu-wrap { position: relative; }
+.pt-menu { position: absolute; bottom: calc(100% + 6px); left: 0; z-index: 5; min-width: 260px; background: #1b1d20; border: 1.5px solid #55595e; box-shadow: -4px 4px 0 #000; padding: 10px; display: flex; flex-direction: column; gap: 8px; text-align: right; }
+.pt-menu .btn { justify-content: space-between; }
+.pt-queue { justify-content: center; max-height: 18vh; padding-top: 4px; border-top: 1px solid #3a3e42; }
+.pt-q-name { font-size: 13px; padding: 3px 8px; }
