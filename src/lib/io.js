@@ -379,14 +379,14 @@ export function whatsappText(p, meetings, byId, settings, link = '') {
   const slots = personalSchedule(p, meetings, byId, settings);
   const lines = slots.map((s) =>
     s.partner
-      ? s.partners.length > 1 ? `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — שולחן משולש: ${s.partners.map((x) => x.name).join(' + ')}` : `▪️ סבב ${s.round} · ${s.time} · שולחן ${s.table} — ${s.partner.name} (${SIDES[s.partner.side]?.he}${profileLine(s.partner) ? ` · ${profileLine(s.partner).slice(0, 60)}${profileLine(s.partner).length > 60 ? '…' : ''}` : ''})`
-      : `▫️ סבב ${s.round} · ${s.time} · נטוורקינג חופשי ☕`,
+      ? s.partners.length > 1 ? `▪️ סבב ${s.round} · שולחן ${s.table} — שולחן משולש: ${s.partners.map((x) => x.name).join(' + ')}` : `▪️ סבב ${s.round} · שולחן ${s.table} — ${s.partner.name} (${SIDES[s.partner.side]?.he}${profileLine(s.partner) ? ` · ${profileLine(s.partner).slice(0, 60)}${profileLine(s.partner).length > 60 ? '…' : ''}` : ''})`
+      : `▫️ סבב ${s.round} · נטוורקינג חופשי ☕`,
   );
   return [
     `היי ${first}! 👋`,
     `הנה הלו"ז האישי שלך ל-${EVENT.brand} – ${EVENT.titleHe} ${EVENT.titleEn}`,
     `📍 ${EVENT.venueHe} / ${EVENT.venueEn}, ${EVENT.address}`,
-    `🗓️ ${EVENT.date} · התכנסות ${settings.doorsTime} · סבב ראשון ${roundTime(settings, 1)}`,
+    `🗓️ ${EVENT.date} · התכנסות ${settings.doorsTime}`,
     '',
     ...lines,
     '',
