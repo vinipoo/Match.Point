@@ -340,8 +340,8 @@ function Portal({ token, onLogout, onInvalid }) {
         {data.schedule && <button className={view === 'schedule' || isLive ? 'on' : ''} onClick={() => setView('schedule')}>הלו״ז שלי</button>}
         {!isLive && <button className={view === 'browse' ? 'on' : ''} onClick={() => setView('browse')}>משתתפים <M>{roster.length - 1}</M></button>}
         {!isLive && <button className={view === 'mine' ? 'on' : ''} onClick={() => setView('mine')}>הבחירות שלי <M>{list.length}/{max}</M></button>}
-        {/* not needed on "my picks" once something is chosen – choices save by themselves */}
-        {!(view === 'mine' && list.length > 0) && (
+        {/* once the participant has chosen someone, no manual refresh anywhere – the page updates itself every 10 s */}
+        {list.length === 0 && (
           <button className="pp-refresh" onClick={refresh} aria-label="רענון" title="רענון">{refreshing ? '…' : '↻'}</button>
         )}
       </nav>
