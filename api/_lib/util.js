@@ -16,6 +16,10 @@ export const K = {
 // setup = pre-event · open = VOTING · closed = LOCKED · published = LIVE
 export const PHASES = ['setup', 'open', 'closed', 'published'];
 
+// participants may pick at most 3 people
+export const MAX_CHOICES = 3;
+export const maxChoicesOf = (ev) => Math.max(1, Math.min(MAX_CHOICES, Number(ev?.maxChoices) || MAX_CHOICES));
+
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 export const newToken = () => [...crypto.randomBytes(12)].map((b) => ABC[b % ABC.length]).join('');
 

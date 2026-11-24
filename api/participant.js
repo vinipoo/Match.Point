@@ -1,6 +1,6 @@
 // Participant API – identified only by the personal token in their link.
 import * as store from './_lib/store.js';
-import { K, send, readBody, effectivePhase, storageProblem } from './_lib/util.js';
+import { K, send, readBody, effectivePhase, storageProblem, maxChoicesOf } from './_lib/util.js';
 
 async function identify(token) {
   if (!token || typeof token !== 'string' || token.length > 64) return null;
@@ -47,8 +47,8 @@ export default async function handler(req, res) {
         me,
         roster,
         pitched: pitched || [],
-        event: { phase, closesAt: ev?.closesAt || null, maxChoices: ev?.maxChoices || 5 },
-        prefs: prefs?.list || [],
+        event: { phase, closesAt: ev?.closesAt || null, maxChoices: maxChoicesOf(ev) },
+        prefs: (prefs?.list || []).slice(0, maxChoicesOf(ev)),
         prefsAt: prefs?.at || null,
         schedule: mySchedule,
         publishedAt: phase === 'published' ? schedule?.publishedAt || null : null,
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       const ev = await store.get(K.event);
       if (effectivePhase(ev) !== 'open') return send(res, 409, { error: 'הגשת ההעדפות סגורה' });
       const valid = new Set(who.roster.map((p) => p.id));
-      const max = ev?.maxChoices || 5;
+      const max = maxChoicesOf(ev);
       const list = [...new Set((Array.isArray(b.list) ? b.list : []).map(String))]
         .filter((id) => valid.has(id) && id !== who.me.id)
         .slice(0, max);

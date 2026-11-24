@@ -238,7 +238,7 @@ function Portal({ token, onLogout, onInvalid }) {
   const isOpen = phase === 'open';
   const isLocked = phase === 'closed';
   const isLive = phase === 'published';
-  const max = data?.event.maxChoices || 5;
+  const max = Math.min(3, data?.event.maxChoices || 3);
 
   const persist = useCallback((next, immediate = false) => {
     dirty.current = true;

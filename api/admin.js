@@ -1,6 +1,6 @@
 // Staff API – every call needs the x-admin-key header (ADMIN_KEY env var on Vercel).
 import * as store from './_lib/store.js';
-import { K, PHASES, send, readBody, effectivePhase, checkAdmin, storageProblem, newToken, publicProfile } from './_lib/util.js';
+import { K, PHASES, MAX_CHOICES, maxChoicesOf, send, readBody, effectivePhase, checkAdmin, storageProblem, newToken, publicProfile } from './_lib/util.js';
 
 async function status() {
   const [ev, roster, tokens, pitched, schedule] = await Promise.all([
@@ -16,7 +16,7 @@ async function status() {
     storage: store.mode,
     storageError: storageProblem(),
     serverNow: new Date().toISOString(),
-    event: { maxChoices: 5, ...(ev || {}), phase: effectivePhase(ev) },
+    event: { ...(ev || {}), maxChoices: maxChoicesOf(ev), phase: effectivePhase(ev) },
     rosterIds: ids,
     tokens: idToToken,
     pitched: pitched || [],
@@ -55,7 +55,7 @@ export default async function handler(req, res) {
         const auth = Object.fromEntries(b.participants
           .map((p) => [String(p.id), String(p.last4 || '').replace(/\D/g, '').slice(-4)])
           .filter(([, d]) => d.length === 4));
-        const ev = (await store.get(K.event)) || { phase: 'setup', maxChoices: 5 };
+        const ev = (await store.get(K.event)) || { phase: 'setup', maxChoices: MAX_CHOICES };
         await Promise.all([
           store.set(K.roster, roster), store.set(K.tokens, tokens), store.set(K.auth, auth),
           store.set(K.event, { ...ev, rosterAt: now }),
@@ -65,9 +65,9 @@ export default async function handler(req, res) {
 
       case 'phase': {
         if (!PHASES.includes(b.phase)) return send(res, 400, { error: 'שלב לא חוקי' });
-        const ev = (await store.get(K.event)) || { maxChoices: 5 };
+        const ev = (await store.get(K.event)) || { maxChoices: MAX_CHOICES };
         const next = { ...ev, phase: b.phase };
-        if (b.maxChoices) next.maxChoices = Math.max(1, Math.min(10, Number(b.maxChoices)));
+        next.maxChoices = maxChoicesOf({ maxChoices: b.maxChoices ?? next.maxChoices });
         if (b.phase === 'open') {
           // optional display-only timer: 0 / missing = no countdown
           const minutes = Math.min(120, Math.max(0, Number(b.minutes) || 0));
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
         const roster = (await store.get(K.roster)) || [];
         await store.del([...roster.map((p) => K.prefs(p.id)), K.schedule, K.pitched]);
         const ev = (await store.get(K.event)) || {};
-        await store.set(K.event, { maxChoices: ev.maxChoices || 5, rosterAt: ev.rosterAt, phase: 'setup' });
+        await store.set(K.event, { maxChoices: maxChoicesOf(ev), rosterAt: ev.rosterAt, phase: 'setup' });
         return send(res, 200, await status());
       }
 

@@ -17,7 +17,7 @@ export default function LiveTab(props) {
   const [busy, setBusy] = useState('');
   const [minutes, setMinutes] = useState(15);
   const [useTimer, setUseTimer] = useState(true);
-  const [maxChoices, setMaxChoices] = useState(5);
+  const [maxChoices, setMaxChoices] = useState(3);
   const [now, setNow] = useState(Date.now());
   const [pendingRun, setPendingRun] = useState(false);
   const offset = useRef(0);
@@ -108,7 +108,7 @@ export default function LiveTab(props) {
       const list = subMap[p.id];
       if (!list) return p;
       n++;
-      return { ...p, prefs: list.filter((id) => ids.has(id) && id !== p.id).map((id, i) => ({ id, rank: i + 1 })) };
+      return { ...p, prefs: list.filter((id) => ids.has(id) && id !== p.id).slice(0, 3).map((id, i) => ({ id, rank: i + 1 })) };
     }));
     return n;
   };
@@ -214,7 +214,7 @@ export default function LiveTab(props) {
                 <label className="field" style={{ width: 120 }}>
                   <span>מקס׳ בחירות</span>
                   <select className="select mono" value={maxChoices} onChange={(e) => setMaxChoices(Number(e.target.value))} disabled={phase === 'open'}>
-                    {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+                    {[1, 2, 3].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
                 {phase === 'open' && closesAt && (
