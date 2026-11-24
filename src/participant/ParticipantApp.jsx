@@ -408,10 +408,10 @@ function Portal({ token, onLogout, onInvalid }) {
             <input className="input" placeholder="חיפוש חופשי: שם, מיזם, תחום…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="חיפוש" />
             <div className="pp-filters">
               <button className={`btn btn-sm ${forMe ? 'btn-lime' : ''}`} aria-pressed={forMe} onClick={() => setForMe((v) => !v)}>🎯 הצג שותפים מהצד המשלים</button>
-              <div className="seg" role="group" aria-label="Pitch">
-                <button className={!pitchOnly ? 'on confirmed' : ''} onClick={() => setPitchOnly(false)}>כולם</button>
-                <button className={pitchOnly ? 'on no_show' : ''} onClick={() => setPitchOnly(true)}>רק מציגי <M>Pitch</M></button>
-              </div>
+              {/* toggle: off = everyone (default), on = only Pitch presenters */}
+              <button className={`btn btn-sm ${pitchOnly ? 'btn-lime' : ''}`} aria-pressed={pitchOnly} onClick={() => setPitchOnly((v) => !v)}>
+                🎤 רק מציגי <M>Pitch</M>
+              </button>
             </div>
             <div className="pp-filters">
               <select className="select" value={industry} onChange={(e) => setIndustry(e.target.value)} aria-label="תחום">
