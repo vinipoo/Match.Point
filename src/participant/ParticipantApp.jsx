@@ -165,8 +165,8 @@ function ProfileCard({ p, rank, canAdd, open, onToggle, max }) {
         onClick={() => onToggle(p.id)}
       >
         {!open
-          ? (rank ? <>✓ בחירה מס׳ <M>{rank}</M></> : 'הבחירה תיפתח כשהצוות יפתח את הדירוג')
-          : rank ? <>✓ עדיפות <M>{rank}</M> · הסר</> : canAdd ? '+ רוצה לפגוש' : `בחרת כבר ${max} – הסירו מישהו כדי להוסיף`}
+          ? (rank ? '✓ נבחר/ה' : 'הבחירה תיפתח כשהצוות יפתח את הדירוג')
+          : rank ? '✓ נבחר/ה · הסר' : canAdd ? '+ רוצה לפגוש' : `בחרת כבר ${max} – הסירו מישהו כדי להוסיף`}
       </button>
     </article>
   );
@@ -309,7 +309,7 @@ function Portal({ token, onLogout, onInvalid }) {
       {phase === 'setup' && <div className="pp-banner">בחירת האנשים תיפתח בהפסקה שאחרי הפיצ׳ים. בינתיים אפשר לעיין בפרופילים.</div>}
       {isOpen && (
         <div className="pp-banner live">
-          <div><b>הדירוג פתוח – בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">לפי עדיפות: מס׳ 1 = הכי חשוב · כל שינוי נשמר מיד</div></div>
+          <div><b>הדירוג פתוח – בחרו עד <M>{max}</M> אנשים שתרצו לפגוש</b><div className="small">כל שינוי נשמר מיד</div></div>
           {closesAt && (left > 0 ? <M className="pp-count">{countdown(left)}</M> : <span className="small"><b>עוד רגע ננעל</b></span>)}
         </div>
       )}
@@ -387,9 +387,8 @@ function Portal({ token, onLogout, onInvalid }) {
               if (!p) return null;
               return (
                 <div key={id} className="pp-rank">
-                  <M className="pp-rank-no" aria-label={`עדיפות ${i + 1}`}>{i + 1}</M>
+                  <M className="pp-rank-no">{i + 1}</M>
                   <div className="pp-rank-body">
-                    <div className="small" style={{ fontWeight: 700 }}>עדיפות {i + 1}{i === 0 ? ' · הכי חשוב' : ''}</div>
                     <div className="pp-name">{p.name} <SideTag side={p.side} /> <PitchBadge n={p.pitchNo} /></div>
                     {(p.idea || p.brings) && <div className="small muted pp-clamp">{p.idea || p.brings}</div>}
                   </div>
