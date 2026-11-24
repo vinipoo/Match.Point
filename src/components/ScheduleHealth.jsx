@@ -19,7 +19,7 @@ export default function ScheduleHealth({ active, settings, setSettings, meetings
     return (
       <Alert tone="warn" icon="!" title={`חסרים שולחנות: ל-${active.length} הנוכחים צריך לפחות ${need} שולחנות (מוגדרים ${settings.tables})`}
         action={<button className="btn btn-mag" onClick={() => { setSettings({ tables: need }); setRunAfterFix(true); }}>קבע <M>{need}</M> שולחנות והרץ שיבוץ</button>}>
-        בלי מספיק שולחנות לא ניתן לתת לכל נוכח {settings.minMeetings} פגישות רצופות בהתחלה, ולכן המערכת לא מריצה שיבוץ. אם יש באולם יותר שולחנות – עדכנו בטאב 01.
+        בלי מספיק שולחנות לא ניתן להושיב כל נוכח מול מישהו בכל סבב, ולכן המערכת לא מריצה שיבוץ. אם יש באולם יותר שולחנות – עדכנו בטאב 01.
       </Alert>
     );
   }

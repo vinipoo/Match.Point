@@ -24,6 +24,8 @@ function PairPicker({ participants, onAdd, label, tone }) {
 export default function EngineTab(props) {
   const { participants, byId, settings, setSettings, weights, setWeights, constraints, addConstraint, removeConstraint, scores, gaps, stats, lastRun, run, meetings, setTab, active } = props;
   const [focus, setFocus] = useState('');
+  // rounds in which everyone present must be seated
+  const effK = settings.seatEveryone !== false ? settings.rounds : Math.min(settings.minMeetings, settings.rounds);
   const wsum = Object.values(weights).reduce((s, v) => s + Number(v), 0) || 1;
 
   const explorer = useMemo(() => {
@@ -68,14 +70,19 @@ export default function EngineTab(props) {
             label="סינון מיזם מול מיזם" hint="לא לשבץ שני יזמים עם מיזם קיים כשאף אחד מהם לא מוכן להצטרף למיזם של האחר." />
           <Toggle checked={settings.allowSameSide} onChange={(v) => setSettings({ allowSameSide: v })}
             label="אפשר התאמות משלימות בתוך אותו צד" hint="Tech-Tech / Biz-Biz לפי כישורים משלימים – מומלץ כשיש פער מספרי." />
-          <div style={{ padding: '8px 10px', background: 'var(--soft)', borderInlineStart: '4px solid var(--lime)', margin: '6px 0' }}>
-            <div style={{ fontWeight: 700 }}>מינימום <M>{settings.minMeetings}</M> פגישות רצופות בתחילת הערב</div>
-            <div className="small muted">
-              בסבבים <M>1–{Math.min(settings.minMeetings, settings.rounds)}</M> המנוע מנסה לשבץ את כולם בכל סבב: קודם התאמות טובות ובחירות הדדיות,
-              ומי שאין לו מספיק – מושלם מול המועמדים עם הציון הגבוה ביותר לפי הטופס והפרופיל (תפקיד, כישורים, שלב מיזם, זמינות ותחום), לא בהגרלה.
-              אחר כך משובצות רק התאמות טובות; סבבים בלי פרטנר מתאים מסומנים כנטוורקינג חופשי.
+          <Toggle checked={settings.seatEveryone !== false} onChange={(v) => setSettings({ seatEveryone: v })}
+            label="שבץ את כל הנוכחים בכל סבב"
+            hint="כל מי שסומן ״הגיע״ יושב מול מישהו בכל אחד מהסבבים – גם בלי העדפות, גם בלי התאמה וגם מתחת לסף. קודם התאמות טובות ובחירות, והשאר לפי הציון הגבוה ביותר מהטופס והפרופיל (לא בהגרלה). אף זוג לא נפגש פעמיים; במספר אי-זוגי יש שולחן משולש אחד." />
+          {settings.seatEveryone === false && (
+            <div style={{ padding: '8px 10px', background: 'var(--soft)', borderInlineStart: '4px solid var(--lime)', margin: '6px 0' }}>
+              <div style={{ fontWeight: 700 }}>מינימום <M>{settings.minMeetings}</M> פגישות רצופות בתחילת הערב</div>
+              <div className="small muted">
+                בסבבים <M>1–{Math.min(settings.minMeetings, settings.rounds)}</M> המנוע מנסה לשבץ את כולם בכל סבב: קודם התאמות טובות ובחירות הדדיות,
+                ומי שאין לו מספיק – מושלם מול המועמדים עם הציון הגבוה ביותר לפי הטופס והפרופיל (תפקיד, כישורים, שלב מיזם, זמינות ותחום), לא בהגרלה.
+                אחר כך משובצות רק התאמות טובות; סבבים בלי פרטנר מתאים מסומנים כנטוורקינג חופשי.
+              </div>
             </div>
-          </div>
+          )}
           <Toggle checked={settings.fairnessFallback} onChange={(v) => setSettings({ fairnessFallback: v })}
             label="בהשלמת המינימום – מותר מאותו צד" hint="כשאין פרטנר פנוי מהצד השני (למשל יותר עסקיים מטכנולוגיים), להשלים מול המועמד הטוב ביותר מאותו צד עם כישורים משלימים." />
           <div style={{ marginTop: 6, padding: '8px 10px', border: '1.5px dashed var(--mag)' }}>
@@ -144,11 +151,11 @@ export default function EngineTab(props) {
             </Alert>
           )}
           {meetings.length > 0 && (stats.earlyGap.length === 0 ? (
-            <Alert tone="ok" icon="✓" title={`לכל המשתתפים יש ${settings.minMeetings} פגישות רצופות בסבבים 1–${Math.min(settings.minMeetings, settings.rounds)}`}>
+            <Alert tone="ok" icon="✓" title={settings.seatEveryone !== false ? `כל הנוכחים משובצים בכל ${settings.rounds} הסבבים` : `לכל המשתתפים יש ${effK} פגישות רצופות בסבבים 1–${effK}`}>
               {stats.sameSideFill > 0 ? `${stats.sameSideFill} מהן הושלמו מאותו צד לפי הפרופיל (אין מספיק פרטנרים מהצד השני).` : 'כולן מול הצד המשלים.'}
             </Alert>
           ) : (
-            <Alert tone="warn" icon={stats.earlyGap.length} title={`לא קיבלו ${settings.minMeetings} פגישות רצופות בהתחלה`}>
+            <Alert tone="warn" icon={stats.earlyGap.length} title={settings.seatEveryone !== false ? 'לא שובצו בכל הסבבים' : `לא קיבלו ${effK} פגישות רצופות בהתחלה`}>
               {stats.earlyGap.map((id) => `${byId[id]?.name} (${stats.count[id] || 0} סה״כ)`).join(' · ')}
               <div style={{ marginTop: 4 }}>
                 {gaps.tablesNeeded > settings.tables

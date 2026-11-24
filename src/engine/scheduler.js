@@ -116,7 +116,8 @@ export function schedule({ participants, scores, settings, constraints, existing
   //   never a random draw. Same-side pairs are used only when no cross-side partner is free.
   //   Rounds K+1..R: only good matches; people still below K are topped up first; everyone else
   //   who has no suitable partner gets free networking (extra meetings already earned are kept).
-  const K = Math.max(1, Math.min(R, Number(settings.minMeetings) || 3));
+  // seatEveryone (default): every present participant gets a partner in EVERY round, below the threshold if needed
+  const K = settings.seatEveryone !== false ? R : Math.max(1, Math.min(R, Number(settings.minMeetings) || 3));
   const allowSameSideFill = settings.fairnessFallback !== false;
 
   const quality = (x, y) => {
@@ -348,7 +349,7 @@ export function scheduleStats(meetings, active, settings, scores) {
     under: active.filter((id) => (count[id] || 0) < settings.minMeetings),
     // the first K rounds should all be meetings ("minimum block")
     earlyGap: (() => {
-      const K = Math.min(Number(settings.minMeetings) || 3, Number(settings.rounds));
+      const K = settings.seatEveryone !== false ? Number(settings.rounds) : Math.min(Number(settings.minMeetings) || 3, Number(settings.rounds));
       const early = {};
       for (const m of meetings) if (m.round <= K) for (const id of members(m)) early[id] = (early[id] || 0) + 1;
       return active.filter((id) => (early[id] || 0) < K);

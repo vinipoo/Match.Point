@@ -34,7 +34,8 @@ export default function App() {
   const [settings, setSettingsRaw] = useState(() => {
     const s = { ...DEFAULT_SETTINGS, ...(saved?.settings || {}) };
     // engine v2: minimum of 3 consecutive meetings at the start replaces the old "2 + lower threshold" rule
-    return saved?.settings?.engineVersion === 3 ? s : { ...s, minMeetings: Math.max(3, Number(s.minMeetings) || 3), engineVersion: 3 };
+    // engine v4: everyone present is seated in every round (seatEveryone)
+    return saved?.settings?.engineVersion === 4 ? s : { ...s, minMeetings: Math.max(3, Number(s.minMeetings) || 3), seatEveryone: true, engineVersion: 4 };
   });
   const [weights, setWeights] = useState({ ...DEFAULT_WEIGHTS, ...(saved?.weights || {}) });
   const [constraints, setConstraints] = useState(saved?.constraints || { must: [], exclude: [] });
@@ -98,7 +99,7 @@ export default function App() {
     // every present participant must be seated in each of the first rounds: refuse an impossible schedule
     const need = Math.floor(active.length / 2);
     if (Number(settings.tables) < need) {
-      notify(`לא ניתן להבטיח ${settings.minMeetings} פגישות רצופות לכל ${active.length} הנוכחים: צריך לפחות ${need} שולחנות (מוגדרים ${settings.tables}). עדכנו בטאב 01.`, 'err');
+      notify(`לא ניתן לשבץ את כל ${active.length} הנוכחים בכל סבב: צריך לפחות ${need} שולחנות (מוגדרים ${settings.tables}). עדכנו בטאב 01.`, 'err');
       return;
     }
     const res = schedule({ participants, scores, settings, constraints, existing: meetings, mode });
