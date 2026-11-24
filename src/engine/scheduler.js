@@ -42,7 +42,7 @@ const shuffle = (arr, rand) => {
 let seq = 0;
 const newId = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-export function schedule({ participants, scores, settings, constraints, existing = [], mode = 'fresh' }) {
+export function schedule({ participants, scores, settings, constraints, existing = [], mode = 'fresh', weights = null }) {
   const R = Number(settings.rounds);
   const T = Number(settings.tables);
   const thr = Number(settings.threshold);
@@ -135,9 +135,12 @@ export function schedule({ participants, scores, settings, constraints, existing
     return inBlock ? [e, 60] : null; // venture-vs-venture: last resort, only to guarantee the minimum
   };
   // priority picks: rank 1 > 2 > … > 5, mutual picks with high ranks on both sides first
+  // the bonus follows the 'explicit preferences' slider: full at the default 45%, none at 0
+  const wsum = weights ? Object.values(weights).reduce((t, v) => t + Number(v || 0), 0) || 1 : 1;
+  const prefScale = weights ? (Number(weights.prefs) || 0) / wsum / 0.45 : 1;
   const prefBonus = (e) => {
-    if (e.prefKind === 'mutual') return 10 + 20 * ((e.rfA + e.rfB) / 2);
-    if (e.prefKind === 'a' || e.prefKind === 'b') return 8 * (e.prefKind === 'a' ? e.rfA : e.rfB);
+    if (e.prefKind === 'mutual') return prefScale * (10 + 20 * ((e.rfA + e.rfB) / 2));
+    if (e.prefKind === 'a' || e.prefKind === 'b') return prefScale * 8 * (e.prefKind === 'a' ? e.rfA : e.rfB);
     return 0;
   };
 

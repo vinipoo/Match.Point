@@ -102,7 +102,7 @@ export default function App() {
       notify(`לא ניתן לשבץ את כל ${active.length} הנוכחים בכל סבב: צריך לפחות ${need} שולחנות (מוגדרים ${settings.tables}). עדכנו בטאב 01.`, 'err');
       return;
     }
-    const res = schedule({ participants, scores, settings, constraints, existing: meetings, mode });
+    const res = schedule({ participants, scores, settings, constraints, existing: meetings, mode, weights });
     setMeetings(res.meetings);
     setLastRun({ at: new Date().toISOString(), ...res.log, total: res.meetings.length });
     const added = res.log.auto + res.log.fallback + res.log.must + (res.log.wildcard || 0);
@@ -115,7 +115,7 @@ export default function App() {
         ? `שיבוץ מחדש: נשמרו ${res.log.kept} פגישות, בוטלו ${res.log.dropped}, נוספו ${added}`
         : `שובצו ${res.meetings.length} פגישות ב-${settings.rounds} סבבים`,
     );
-  }, [active.length, participants, scores, settings, constraints, meetings, notify]);
+  }, [active.length, participants, scores, settings, constraints, meetings, notify, weights]);
 
   const addConstraint = useCallback((type, a, b) => {
     if (!a || !b || a === b) return;
