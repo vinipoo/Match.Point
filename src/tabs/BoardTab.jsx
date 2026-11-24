@@ -3,6 +3,7 @@ import { Card, M, SideTag, Reason, Alert, Empty } from '../components/ui';
 import { explain, pairKey, BLOCK_REASONS } from '../engine/scoring';
 import { roundTime, roundEnd, members } from '../engine/scheduler';
 import LivePublishBar from '../components/LivePublishBar';
+import ScheduleHealth from '../components/ScheduleHealth';
 
 const pad = (n) => String(n).padStart(2, '0');
 let seq = 0;
@@ -95,6 +96,8 @@ export default function BoardTab(props) {
 
   if (!meetings.length) {
     return (
+      <div className="stack">
+      <ScheduleHealth active={active} settings={settings} setSettings={setSettings} meetings={meetings} run={run} />
       <Empty title="הלוח ריק">
         עדיין לא הורץ שיבוץ.
         <div className="row" style={{ justifyContent: 'center', marginTop: 12 }}>
@@ -102,6 +105,7 @@ export default function BoardTab(props) {
           <button className="btn" onClick={() => setTab('engine')}>למשקלים והגדרות</button>
         </div>
       </Empty>
+      </div>
     );
   }
 
@@ -133,6 +137,7 @@ export default function BoardTab(props) {
         </div>
       </div>
 
+      <ScheduleHealth active={active} settings={settings} setSettings={setSettings} meetings={meetings} run={run} />
       <LivePublishBar publishLive={publishLive} openQr={openQr} boardDirty={boardDirty} cloud={cloud} meetings={meetings} />
 
       {broken.length > 0 && (

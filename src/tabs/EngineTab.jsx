@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, Kpi, M, SideTag, Toggle, Alert, Empty } from '../components/ui';
 import GapPanel from '../components/GapPanel';
+import ScheduleHealth from '../components/ScheduleHealth';
 import { WEIGHT_LABELS, DEFAULT_WEIGHTS, SIDES } from '../lib/constants';
 import { pairKey, BLOCK_REASONS } from '../engine/scoring';
 
@@ -106,6 +107,7 @@ export default function EngineTab(props) {
 
       <Card num="03.C" title="הרצת אלגוריתם השיבוץ" en="Optimizer">
         <div className="stack" style={{ gap: 16 }}>
+          <ScheduleHealth active={active} settings={settings} setSettings={setSettings} meetings={meetings} run={run} />
           <div className="row">
             <button className="btn btn-lime btn-lg" onClick={() => { run('fresh'); setTab('board'); }}>▶ הרץ שיבוץ</button>
             <button className="btn btn-mag btn-lg" disabled={!meetings.length} onClick={() => { run('preserve'); setTab('board'); }}>
