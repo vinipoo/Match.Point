@@ -382,11 +382,6 @@ function Portal({ token, onLogout, onInvalid }) {
         {!isLive && view === 'mine' && (
           <div className="pp-stack">
             {list.length === 0 && <div className="pp-banner">עדיין לא בחרת אף אחד. עברו ל״משתתפים״ ולחצו ״רוצה לפגוש״.</div>}
-            {list.length > 0 && (
-              <div className="pp-banner">
-                <b>סדר עדיפות:</b> <M>1</M> = הכי חשוב לי. {isOpen ? 'שנו את הסדר עם החצים ▲▼ – עדיפות גבוהה מקבלת משקל גבוה יותר בשיבוץ.' : 'הסדר נשמר כפי ששלחת.'}
-              </div>
-            )}
             {list.map((id, i) => {
               const p = byId[id];
               if (!p) return null;
@@ -400,8 +395,6 @@ function Portal({ token, onLogout, onInvalid }) {
                   </div>
                   {isOpen && (
                     <div className="pp-rank-acts">
-                      <button className="btn btn-sm" onClick={() => move(i, -1)} disabled={i === 0} aria-label="העלה עדיפות">▲</button>
-                      <button className="btn btn-sm" onClick={() => move(i, 1)} disabled={i === list.length - 1} aria-label="הורד עדיפות">▼</button>
                       <button className="btn btn-sm btn-danger" onClick={() => toggle(id)} aria-label="הסר">✕</button>
                     </div>
                   )}
